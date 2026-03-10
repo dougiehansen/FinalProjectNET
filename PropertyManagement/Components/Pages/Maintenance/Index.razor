@@ -1,0 +1,453 @@
+@page "/maintenance"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject IMaintenanceService MaintenanceService
+@inject IPropertyService PropertyService
+@inject IUnitService UnitService
+@inject IUserService UserService
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Work Orders - PropertyMS</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="fw-bold mb-0">Maintenance Work Orders</h4>
+    <AuthorizeView Roles="Administrator,PropertyManager,MaintenanceStaff">
+        <button class="btn btn-primary" @onclick="OpenSubmitForm">+ Submit Request</button>
+    </AuthorizeView>
+</div>
+
+@if (!string.IsNullOrEmpty(successMsg))
+{
+    <div class="alert alert-success alert-dismissible">@successMsg
+        <button type="button" class="btn-close" @onclick="() => successMsg = string.Empty"></button>
+    </div>
+}
+
+<!-- Status filter tabs -->
+<ul class="nav nav-tabs mb-3">
+    <li class="nav-item">
+        <button class="nav-link @(statusFilter == null ? "active" : "")" @onclick="() => SetFilter(null)">All</button>
+    </li>
+    @foreach (var s in Enum.GetValues<MaintenanceStatus>())
+    {
+        <li class="nav-item">
+            <button class="nav-link @(statusFilter == s ? "active" : "")" @onclick="() => SetFilter(s)">@s</button>
+        </li>
+    }
+</ul>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        @if (loading)
+        {
+            <div class="d-flex justify-content-center py-4"><div class="spinner-border text-primary"></div></div>
+        }
+        else if (!FilteredRequests.Any())
+        {
+            <p class="text-muted p-4 mb-0">No work orders found.</p>
+        }
+        else
+        {
+            <table class="table mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>#</th><th>Title</th><th>Property / Unit</th><th>Urgency</th>
+                        <th>Status</th><th>Assigned To</th><th>Submitted</th><th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var m in FilteredRequests)
+                    {
+                        <tr>
+                            <td class="text-muted small">@m.Id</td>
+                            <td>@m.Title</td>
+                            <td>@m.Property.Name – @m.Unit.UnitNumber</td>
+                            <td><span class="badge @GetUrgencyBadge(m.UrgencyLevel)">@m.UrgencyLevel</span></td>
+                            <td><span class="badge @GetStatusBadge(m.Status)">@m.Status</span></td>
+                            <td>@(m.AssignedTo?.FullName ?? "–")</td>
+                            <td class="small text-muted">@m.CreatedAt.ToString("dd MMM yyyy")</td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => OpenDetailModal(m)">View</button>
+                                <AuthorizeView Roles="Administrator,PropertyManager">
+                                    @if (m.Status == MaintenanceStatus.Open)
+                                    {
+                                        <button class="btn btn-sm btn-outline-primary ms-1" @onclick="() => OpenAssignModal(m)">Assign</button>
+                                    }
+                                </AuthorizeView>
+                                <AuthorizeView Roles="MaintenanceStaff,Administrator,PropertyManager">
+                                    @if (m.Status == MaintenanceStatus.Assigned || m.Status == MaintenanceStatus.InProgress)
+                                    {
+                                        <button class="btn btn-sm btn-outline-success ms-1" @onclick="() => OpenUpdateModal(m)">Update</button>
+                                    }
+                                </AuthorizeView>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+<!-- Submit Request Modal -->
+@if (showSubmitForm)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal d-block">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Submit Maintenance Request</h5>
+                    <button type="button" class="btn-close" @onclick="() => showSubmitForm = false"></button>
+                </div>
+                <div class="modal-body">
+                    @if (!string.IsNullOrEmpty(formError))
+                    {
+                        <div class="alert alert-danger">@formError</div>
+                    }
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Property *</label>
+                            <select class="form-select" value="@newRequest.PropertyId" @onchange="OnPropertySelected">
+                                <option value="0">Select property...</option>
+                                @foreach (var p in allProperties)
+                                {
+                                    <option value="@p.Id">@p.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Unit *</label>
+                            <select class="form-select" @bind="newRequest.UnitId">
+                                <option value="0">Select unit...</option>
+                                @foreach (var u in unitsForProperty)
+                                {
+                                    <option value="@u.Id">@u.UnitNumber</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Title *</label>
+                            <input class="form-control" @bind="newRequest.Title" placeholder="Brief description of the issue" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Description *</label>
+                            <textarea class="form-control" rows="3" @bind="newRequest.Description" placeholder="Detailed description of the issue"></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Urgency Level</label>
+                            <select class="form-select" @bind="newRequest.UrgencyLevel">
+                                @foreach (var u in Enum.GetValues<UrgencyLevel>())
+                                {
+                                    <option value="@u">@u</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => showSubmitForm = false">Cancel</button>
+                    <button class="btn btn-primary" @onclick="SubmitRequest">Submit Request</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Assign Modal -->
+@if (showAssignModal && selectedRequest != null)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal d-block">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Assign Work Order</h5>
+                    <button type="button" class="btn-close" @onclick="() => showAssignModal = false"></button>
+                </div>
+                <div class="modal-body">
+                    @if (!string.IsNullOrEmpty(formError))
+                    {
+                        <div class="alert alert-danger">@formError</div>
+                    }
+                    <p class="text-muted small">Work Order: <strong>@selectedRequest.Title</strong></p>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Assign To *</label>
+                        <select class="form-select" @bind="assignToUserId">
+                            <option value="0">Select staff member...</option>
+                            @foreach (var s in maintenanceStaff)
+                            {
+                                <option value="@s.Id">@s.FullName</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Priority</label>
+                        <select class="form-select" @bind="assignPriority">
+                            <option>Low</option>
+                            <option>Normal</option>
+                            <option>High</option>
+                            <option>Urgent</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Assignment Notes</label>
+                        <textarea class="form-control" rows="2" @bind="assignNotes"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => showAssignModal = false">Cancel</button>
+                    <button class="btn btn-primary" @onclick="AssignRequest">Confirm Assignment</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Update Status Modal -->
+@if (showUpdateModal && selectedRequest != null)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal d-block">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Update Work Order Status</h5>
+                    <button type="button" class="btn-close" @onclick="() => showUpdateModal = false"></button>
+                </div>
+                <div class="modal-body">
+                    @if (!string.IsNullOrEmpty(formError))
+                    {
+                        <div class="alert alert-danger">@formError</div>
+                    }
+                    <p class="text-muted small mb-3">Work Order: <strong>@selectedRequest.Title</strong></p>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Status</label>
+                            <select class="form-select" @bind="selectedRequest.Status">
+                                <option value="@MaintenanceStatus.InProgress">In Progress</option>
+                                <option value="@MaintenanceStatus.Completed">Completed</option>
+                            </select>
+                        </div>
+                        @if (selectedRequest.Status == MaintenanceStatus.Completed)
+                        {
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Completion Date *</label>
+                                <input class="form-control" type="date" @bind="selectedRequest.CompletionDate" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Estimated Cost (&#8364;)</label>
+                                <input class="form-control" type="number" @bind="selectedRequest.EstimatedCost" step="0.01" min="0" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Materials Used</label>
+                                <input class="form-control" @bind="selectedRequest.MaterialsUsed" />
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-semibold">Completion Notes</label>
+                                <textarea class="form-control" rows="2" @bind="selectedRequest.CompletionNotes"></textarea>
+                            </div>
+                        }
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => showUpdateModal = false">Cancel</button>
+                    <button class="btn btn-primary" @onclick="UpdateStatus">Save Update</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- View Detail Modal -->
+@if (showDetailModal && selectedRequest != null)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal d-block">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Work Order #@selectedRequest.Id</h5>
+                    <button type="button" class="btn-close" @onclick="() => showDetailModal = false"></button>
+                </div>
+                <div class="modal-body">
+                    <dl class="row">
+                        <dt class="col-sm-4">Title</dt><dd class="col-sm-8">@selectedRequest.Title</dd>
+                        <dt class="col-sm-4">Property</dt><dd class="col-sm-8">@selectedRequest.Property.Name</dd>
+                        <dt class="col-sm-4">Unit</dt><dd class="col-sm-8">@selectedRequest.Unit.UnitNumber</dd>
+                        <dt class="col-sm-4">Description</dt><dd class="col-sm-8">@selectedRequest.Description</dd>
+                        <dt class="col-sm-4">Urgency</dt><dd class="col-sm-8"><span class="badge @GetUrgencyBadge(selectedRequest.UrgencyLevel)">@selectedRequest.UrgencyLevel</span></dd>
+                        <dt class="col-sm-4">Status</dt><dd class="col-sm-8"><span class="badge @GetStatusBadge(selectedRequest.Status)">@selectedRequest.Status</span></dd>
+                        <dt class="col-sm-4">Submitted By</dt><dd class="col-sm-8">@selectedRequest.SubmittedBy.FullName</dd>
+                        <dt class="col-sm-4">Assigned To</dt><dd class="col-sm-8">@(selectedRequest.AssignedTo?.FullName ?? "Unassigned")</dd>
+                        <dt class="col-sm-4">Priority</dt><dd class="col-sm-8">@(selectedRequest.Priority ?? "–")</dd>
+                        @if (!string.IsNullOrEmpty(selectedRequest.AssignmentNotes))
+                        {
+                            <dt class="col-sm-4">Assignment Notes</dt><dd class="col-sm-8">@selectedRequest.AssignmentNotes</dd>
+                        }
+                        @if (selectedRequest.Status == MaintenanceStatus.Completed)
+                        {
+                            <dt class="col-sm-4">Completed</dt><dd class="col-sm-8">@selectedRequest.CompletionDate?.ToString("dd MMM yyyy")</dd>
+                            <dt class="col-sm-4">Cost</dt><dd class="col-sm-8">@(selectedRequest.EstimatedCost.HasValue ? $"€{selectedRequest.EstimatedCost:N2}" : "–")</dd>
+                            <dt class="col-sm-4">Materials</dt><dd class="col-sm-8">@(selectedRequest.MaterialsUsed ?? "–")</dd>
+                            <dt class="col-sm-4">Completion Notes</dt><dd class="col-sm-8">@(selectedRequest.CompletionNotes ?? "–")</dd>
+                        }
+                    </dl>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => showDetailModal = false">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    bool loading = true, showSubmitForm, showAssignModal, showUpdateModal, showDetailModal;
+    List<MaintenanceRequest> allRequests = new();
+    List<Property> allProperties = new();
+    List<Unit> unitsForProperty = new();
+    List<ApplicationUser> maintenanceStaff = new();
+    MaintenanceRequest newRequest = new();
+    MaintenanceRequest? selectedRequest;
+    MaintenanceStatus? statusFilter;
+    int assignToUserId, currentUserId;
+    string assignPriority = "Normal", assignNotes = string.Empty;
+    string successMsg = string.Empty, formError = string.Empty;
+    string currentRole = string.Empty;
+
+    IEnumerable<MaintenanceRequest> FilteredRequests =>
+        statusFilter == null ? allRequests : allRequests.Where(r => r.Status == statusFilter);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthStateProvider.GetAuthenticationStateAsync();
+        int.TryParse(state.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out currentUserId);
+        currentRole = state.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "";
+
+        await LoadData();
+        allProperties = await PropertyService.GetAllAsync();
+        maintenanceStaff = await UserService.GetByRoleAsync(UserRole.MaintenanceStaff);
+        loading = false;
+    }
+
+    async Task LoadData()
+    {
+        if (currentRole == "MaintenanceStaff")
+            allRequests = await MaintenanceService.GetAssignedToAsync(currentUserId);
+        else
+            allRequests = await MaintenanceService.GetAllAsync();
+    }
+
+    void SetFilter(MaintenanceStatus? s)
+    {
+        statusFilter = s;
+    }
+
+    void OpenSubmitForm()
+    {
+        newRequest = new MaintenanceRequest { UrgencyLevel = UrgencyLevel.Medium };
+        unitsForProperty = new();
+        formError = string.Empty;
+        showSubmitForm = true;
+    }
+
+    async Task OnPropertySelected(ChangeEventArgs e)
+    {
+        newRequest.PropertyId = int.Parse(e.Value?.ToString() ?? "0");
+        unitsForProperty = newRequest.PropertyId > 0
+            ? await UnitService.GetByPropertyAsync(newRequest.PropertyId)
+            : new();
+        newRequest.UnitId = 0;
+    }
+
+    async Task SubmitRequest()
+    {
+        if (newRequest.PropertyId == 0 || newRequest.UnitId == 0 ||
+            string.IsNullOrWhiteSpace(newRequest.Title) || string.IsNullOrWhiteSpace(newRequest.Description))
+        {
+            formError = "Property, unit, title, and description are required.";
+            return;
+        }
+
+        newRequest.SubmittedByUserId = currentUserId;
+        await MaintenanceService.CreateAsync(newRequest);
+        showSubmitForm = false;
+        successMsg = "Maintenance request submitted.";
+        await LoadData();
+    }
+
+    void OpenAssignModal(MaintenanceRequest m)
+    {
+        selectedRequest = m;
+        assignToUserId = 0;
+        assignPriority = "Normal";
+        assignNotes = string.Empty;
+        formError = string.Empty;
+        showAssignModal = true;
+    }
+
+    async Task AssignRequest()
+    {
+        if (assignToUserId == 0)
+        {
+            formError = "Please select a staff member.";
+            return;
+        }
+        await MaintenanceService.AssignAsync(selectedRequest!.Id, assignToUserId, assignPriority, assignNotes);
+        showAssignModal = false;
+        successMsg = "Work order assigned successfully.";
+        await LoadData();
+    }
+
+    void OpenUpdateModal(MaintenanceRequest m)
+    {
+        selectedRequest = new MaintenanceRequest
+        {
+            Id = m.Id, Title = m.Title, Status = m.Status,
+            Property = m.Property, Unit = m.Unit, SubmittedBy = m.SubmittedBy, AssignedTo = m.AssignedTo,
+            Description = m.Description, UrgencyLevel = m.UrgencyLevel, Priority = m.Priority,
+            AssignmentNotes = m.AssignmentNotes, CompletionDate = m.CompletionDate,
+            MaterialsUsed = m.MaterialsUsed, EstimatedCost = m.EstimatedCost, CompletionNotes = m.CompletionNotes
+        };
+        formError = string.Empty;
+        showUpdateModal = true;
+    }
+
+    async Task UpdateStatus()
+    {
+        if (selectedRequest!.Status == MaintenanceStatus.Completed && !selectedRequest.CompletionDate.HasValue)
+        {
+            formError = "Completion date is required when marking as completed.";
+            return;
+        }
+        await MaintenanceService.UpdateAsync(selectedRequest!);
+        showUpdateModal = false;
+        successMsg = "Work order status updated.";
+        await LoadData();
+    }
+
+    void OpenDetailModal(MaintenanceRequest m)
+    {
+        selectedRequest = m;
+        showDetailModal = true;
+    }
+
+    string GetStatusBadge(MaintenanceStatus s) => s switch
+    {
+        MaintenanceStatus.Open => "bg-danger",
+        MaintenanceStatus.Assigned => "bg-warning text-dark",
+        MaintenanceStatus.InProgress => "bg-info",
+        MaintenanceStatus.Completed => "bg-success",
+        MaintenanceStatus.Cancelled => "bg-secondary",
+        _ => "bg-secondary"
+    };
+
+    string GetUrgencyBadge(UrgencyLevel u) => u switch
+    {
+        UrgencyLevel.Emergency => "bg-danger",
+        UrgencyLevel.High => "bg-warning text-dark",
+        UrgencyLevel.Medium => "bg-info",
+        UrgencyLevel.Low => "bg-secondary",
+        _ => "bg-secondary"
+    };
+}

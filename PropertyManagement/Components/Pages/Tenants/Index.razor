@@ -1,0 +1,179 @@
+@page "/tenants"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Administrator,PropertyManager")]
+@inject ITenantService TenantService
+
+<PageTitle>Tenants - PropertyMS</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="fw-bold mb-0">Tenants</h4>
+    <button class="btn btn-primary" @onclick="() => OpenForm()">+ Add Tenant</button>
+</div>
+
+@if (!string.IsNullOrEmpty(successMsg))
+{
+    <div class="alert alert-success alert-dismissible">@successMsg <button type="button" class="btn-close" @onclick="() => successMsg = string.Empty"></button></div>
+}
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        @if (loading)
+        {
+            <div class="d-flex justify-content-center py-4"><div class="spinner-border text-primary"></div></div>
+        }
+        else if (!tenants.Any())
+        {
+            <p class="text-muted p-4 mb-0">No tenants found. Add your first tenant.</p>
+        }
+        else
+        {
+            <div class="p-3 border-bottom">
+                <input class="form-control" style="max-width:300px" placeholder="Search by name or email..."
+                       @bind="searchTerm" @bind:event="oninput" />
+            </div>
+            <table class="table mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Name</th><th>Email</th><th>Phone</th><th>Employer</th><th>Status</th><th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var t in FilteredTenants)
+                    {
+                        <tr>
+                            <td>@t.FullName</td>
+                            <td>@t.Email</td>
+                            <td>@t.Phone</td>
+                            <td>@t.EmployerName</td>
+                            <td><span class="badge @(t.IsActive ? "bg-success" : "bg-secondary")">@(t.IsActive ? "Active" : "Inactive")</span></td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary" @onclick="() => OpenForm(t)">Edit</button>
+                                @if (t.IsActive)
+                                {
+                                    <button class="btn btn-sm btn-outline-danger ms-1" @onclick="() => Deactivate(t.Id)">Deactivate</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+@if (showForm)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal d-block">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(editing.Id == 0 ? "Add Tenant" : "Edit Tenant")</h5>
+                    <button type="button" class="btn-close" @onclick="() => showForm = false"></button>
+                </div>
+                <div class="modal-body">
+                    @if (!string.IsNullOrEmpty(formError))
+                    {
+                        <div class="alert alert-danger">@formError</div>
+                    }
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">First Name *</label>
+                            <input class="form-control" @bind="editing.FirstName" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Last Name *</label>
+                            <input class="form-control" @bind="editing.LastName" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Email *</label>
+                            <input class="form-control" type="email" @bind="editing.Email" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Phone</label>
+                            <input class="form-control" @bind="editing.Phone" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Date of Birth</label>
+                            <input class="form-control" type="date" @bind="editing.DateOfBirth" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Employer Name</label>
+                            <input class="form-control" @bind="editing.EmployerName" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Employer Phone</label>
+                            <input class="form-control" @bind="editing.EmployerPhone" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Emergency Contact Name</label>
+                            <input class="form-control" @bind="editing.EmergencyContactName" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Emergency Contact Phone</label>
+                            <input class="form-control" @bind="editing.EmergencyContactPhone" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Notes</label>
+                            <textarea class="form-control" rows="2" @bind="editing.Notes"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => showForm = false">Cancel</button>
+                    <button class="btn btn-primary" @onclick="Save">Save Tenant</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    bool loading = true, showForm;
+    List<Tenant> tenants = new();
+    Tenant editing = new();
+    string successMsg = string.Empty, formError = string.Empty, searchTerm = string.Empty;
+
+    IEnumerable<Tenant> FilteredTenants => string.IsNullOrWhiteSpace(searchTerm)
+        ? tenants
+        : tenants.Where(t => t.FullName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)
+                           || t.Email.Contains(searchTerm, StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnInitializedAsync()
+    {
+        tenants = await TenantService.GetAllAsync();
+        loading = false;
+    }
+
+    void OpenForm(Tenant? t = null)
+    {
+        editing = t != null
+            ? new Tenant { Id = t.Id, FirstName = t.FirstName, LastName = t.LastName, Email = t.Email, Phone = t.Phone, DateOfBirth = t.DateOfBirth, EmployerName = t.EmployerName, EmployerPhone = t.EmployerPhone, EmergencyContactName = t.EmergencyContactName, EmergencyContactPhone = t.EmergencyContactPhone, Notes = t.Notes, IsActive = t.IsActive }
+            : new Tenant();
+        formError = string.Empty;
+        showForm = true;
+    }
+
+    async Task Save()
+    {
+        if (string.IsNullOrWhiteSpace(editing.FirstName) || string.IsNullOrWhiteSpace(editing.LastName) || string.IsNullOrWhiteSpace(editing.Email))
+        {
+            formError = "First name, last name, and email are required.";
+            return;
+        }
+        if (editing.Id == 0)
+            await TenantService.CreateAsync(editing);
+        else
+            await TenantService.UpdateAsync(editing);
+
+        showForm = false;
+        successMsg = "Tenant saved successfully.";
+        tenants = await TenantService.GetAllAsync();
+    }
+
+    async Task Deactivate(int id)
+    {
+        await TenantService.DeactivateAsync(id);
+        successMsg = "Tenant deactivated.";
+        tenants = await TenantService.GetAllAsync();
+    }
+}

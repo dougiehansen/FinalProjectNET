@@ -1,0 +1,623 @@
+@page "/"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject IPropertyService PropertyService
+@inject ILeaseService LeaseService
+@inject IMaintenanceService MaintenanceService
+@inject IRentPaymentService RentPaymentService
+@inject IJSRuntime JS
+
+<PageTitle>Dashboard — KeyPort</PageTitle>
+
+<div class="db-header">
+    <div>
+        <div class="db-eyebrow">Overview</div>
+        <h1 class="db-title">Dashboard</h1>
+    </div>
+</div>
+
+@if (loading)
+{
+    <div class="db-loading">
+        <div class="db-spinner"></div>
+        <span>Loading dashboard…</span>
+    </div>
+}
+else
+{
+    <!-- KPI Cards -->
+    <div class="kpi-grid">
+
+        <div class="kpi-card">
+            <div class="kpi-icon kpi-icon--blue">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+                    <polyline points="9,22 9,12 15,12 15,22"/>
+                </svg>
+            </div>
+            <div class="kpi-body">
+                <div class="kpi-label">Total Properties</div>
+                <div class="kpi-value">@totalProperties</div>
+            </div>
+            <div class="kpi-trend kpi-trend--neutral">Active</div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon kpi-icon--green">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                </svg>
+            </div>
+            <div class="kpi-body">
+                <div class="kpi-label">Occupancy Rate</div>
+                <div class="kpi-value">@occupancyRate<span class="kpi-unit">%</span></div>
+            </div>
+            <div class="kpi-trend kpi-trend--@(occupancyRate >= 80 ? "up" : occupancyRate >= 50 ? "neutral" : "down")">
+                @(occupancyRate >= 80 ? "Healthy" : occupancyRate >= 50 ? "Moderate" : "Low")
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon kpi-icon--indigo">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                    <polyline points="14,2 14,8 20,8"/>
+                    <line x1="16" y1="13" x2="8" y2="13"/>
+                    <line x1="16" y1="17" x2="8" y2="17"/>
+                </svg>
+            </div>
+            <div class="kpi-body">
+                <div class="kpi-label">Active Leases</div>
+                <div class="kpi-value">@activeLeases</div>
+            </div>
+            <div class="kpi-trend kpi-trend--neutral">Active</div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon kpi-icon--@(openWorkOrders > 0 ? "amber" : "green")">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>
+                </svg>
+            </div>
+            <div class="kpi-body">
+                <div class="kpi-label">Open Work Orders</div>
+                <div class="kpi-value">@openWorkOrders</div>
+            </div>
+            <div class="kpi-trend kpi-trend--@(openWorkOrders > 0 ? "down" : "up")">
+                @(openWorkOrders > 0 ? "Needs attention" : "All clear")
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Charts row -->
+    <div class="charts-grid">
+
+        <div class="db-panel">
+            <div class="db-panel-header">
+                <div class="db-panel-title">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M12 2a10 10 0 010 20"/>
+                        <path d="M12 12L2 12"/>
+                    </svg>
+                    Unit Occupancy
+                </div>
+                <span class="db-panel-badge">@totalUnits units total</span>
+            </div>
+            <div class="db-panel-body chart-body">
+                <canvas id="occupancyChart"></canvas>
+            </div>
+        </div>
+
+        <div class="db-panel">
+            <div class="db-panel-header">
+                <div class="db-panel-title">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="20" x2="18" y2="10"/>
+                        <line x1="12" y1="20" x2="12" y2="4"/>
+                        <line x1="6" y1="20" x2="6" y2="14"/>
+                    </svg>
+                    Work Orders by Status
+                </div>
+                <span class="db-panel-badge">@(statusCounts.Values.Sum()) total</span>
+            </div>
+            <div class="db-panel-body chart-body">
+                <canvas id="maintenanceChart"></canvas>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Tables row -->
+    <div class="db-grid">
+
+        <!-- Expiring leases -->
+        <div class="db-panel">
+            <div class="db-panel-header">
+                <div class="db-panel-title">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                        <line x1="16" y1="2" x2="16" y2="6"/>
+                        <line x1="8" y1="2" x2="8" y2="6"/>
+                        <line x1="3" y1="10" x2="21" y2="10"/>
+                    </svg>
+                    Leases Expiring in 60 Days
+                </div>
+                @if (expiringLeases.Any())
+                {
+                    <span class="db-panel-badge db-panel-badge--amber">@expiringLeases.Count expiring</span>
+                }
+            </div>
+            <div class="db-panel-body">
+                @if (!expiringLeases.Any())
+                {
+                    <div class="db-empty">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:#22c55e;margin-bottom:0.5rem">
+                            <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
+                            <polyline points="22,4 12,14.01 9,11.01"/>
+                        </svg>
+                        <span>No leases expiring soon</span>
+                    </div>
+                }
+                else
+                {
+                    <table class="db-table">
+                        <thead>
+                            <tr><th>Tenant</th><th>Unit</th><th>Expires</th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var l in expiringLeases)
+                            {
+                                <tr>
+                                    <td>
+                                        <div class="db-tenant">
+                                            <div class="db-avatar">@(l.Tenant.FullName.Length > 0 ? l.Tenant.FullName[0].ToString() : "?")</div>
+                                            @l.Tenant.FullName
+                                        </div>
+                                    </td>
+                                    <td class="db-muted">@l.Unit.Property.Name · @l.Unit.UnitNumber</td>
+                                    <td><span class="db-badge db-badge--amber">@l.EndDate.ToString("dd MMM yyyy")</span></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        </div>
+
+        <!-- Recent work orders -->
+        <div class="db-panel">
+            <div class="db-panel-header">
+                <div class="db-panel-title">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>
+                    </svg>
+                    Recent Work Orders
+                </div>
+                @if (recentMaintenance.Any())
+                {
+                    <span class="db-panel-badge">@recentMaintenance.Count recent</span>
+                }
+            </div>
+            <div class="db-panel-body">
+                @if (!recentMaintenance.Any())
+                {
+                    <div class="db-empty">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:#22c55e;margin-bottom:0.5rem">
+                            <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
+                            <polyline points="22,4 12,14.01 9,11.01"/>
+                        </svg>
+                        <span>No maintenance requests</span>
+                    </div>
+                }
+                else
+                {
+                    <table class="db-table">
+                        <thead>
+                            <tr><th>Title</th><th>Property</th><th>Status</th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var m in recentMaintenance)
+                            {
+                                <tr>
+                                    <td class="db-bold">@m.Title</td>
+                                    <td class="db-muted">@m.Property.Name</td>
+                                    <td><span class="db-badge @GetStatusClass(m.Status)">@m.Status</span></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        </div>
+
+        <!-- Outstanding balances -->
+        <AuthorizeView Roles="Administrator,PropertyManager,AccountingTeam">
+            <div class="db-panel db-panel--full">
+                <div class="db-panel-header">
+                    <div class="db-panel-title">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/>
+                            <line x1="1" y1="10" x2="23" y2="10"/>
+                        </svg>
+                        Outstanding Balances
+                    </div>
+                    @if (delinquentAccounts.Any())
+                    {
+                        <span class="db-panel-badge db-panel-badge--red">@delinquentAccounts.Count accounts</span>
+                    }
+                </div>
+                <div class="db-panel-body">
+                    @if (!delinquentAccounts.Any())
+                    {
+                        <div class="db-empty">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:#22c55e;margin-bottom:0.5rem">
+                                <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
+                                <polyline points="22,4 12,14.01 9,11.01"/>
+                            </svg>
+                            <span>No outstanding balances</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <table class="db-table">
+                            <thead>
+                                <tr><th>Tenant</th><th>Unit</th><th>Balance</th></tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var (tenant, lease, balance) in delinquentAccounts)
+                                {
+                                    <tr>
+                                        <td>
+                                            <div class="db-tenant">
+                                                <div class="db-avatar db-avatar--red">@(tenant.FullName.Length > 0 ? tenant.FullName[0].ToString() : "?")</div>
+                                                @tenant.FullName
+                                            </div>
+                                        </td>
+                                        <td class="db-muted">@lease.Unit?.UnitNumber</td>
+                                        <td><span class="db-badge db-badge--red">€ @balance.ToString("N2")</span></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                </div>
+            </div>
+        </AuthorizeView>
+
+    </div>
+}
+
+<style>
+    /* ── Page header ── */
+    .db-header {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        margin-bottom: 1.75rem;
+    }
+    .db-eyebrow {
+        font-size: 0.7rem;
+        font-weight: 600;
+        color: #94a3b8;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-bottom: 0.2rem;
+    }
+    .db-title {
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: #0f172a;
+        letter-spacing: -0.4px;
+        margin: 0;
+    }
+
+    /* ── Loading ── */
+    .db-loading {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+        padding: 5rem 0;
+        color: #94a3b8;
+        font-size: 0.85rem;
+    }
+    .db-spinner {
+        width: 28px;
+        height: 28px;
+        border: 2.5px solid #e3ddd5;
+        border-top-color: #c4944a;
+        border-radius: 50%;
+        animation: spin 0.7s linear infinite;
+    }
+    @@keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── KPI grid ── */
+    .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    @@media (max-width: 1200px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+    @@media (max-width: 600px)  { .kpi-grid { grid-template-columns: 1fr; } }
+
+    .kpi-card {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 1.25rem 1.35rem;
+        display: flex;
+        align-items: flex-start;
+        gap: 1rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        transition: box-shadow 0.15s;
+    }
+    .kpi-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+
+    .kpi-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 11px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+    .kpi-icon--blue    { background: #f5ede0; color: #c4944a; }
+    .kpi-icon--green   { background: #f0f5ec; color: #5a7a4a; }
+    .kpi-icon--indigo  { background: #f2ede8; color: #8b7355; }
+    .kpi-icon--amber   { background: #fdf4e8; color: #b07030; }
+
+    .kpi-body { flex: 1; min-width: 0; }
+    .kpi-label {
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: #64748b;
+        margin-bottom: 0.3rem;
+        white-space: nowrap;
+    }
+    .kpi-value {
+        font-size: 1.85rem;
+        font-weight: 800;
+        color: #0f172a;
+        line-height: 1;
+        letter-spacing: -0.5px;
+    }
+    .kpi-unit {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #64748b;
+    }
+    .kpi-trend {
+        font-size: 0.67rem;
+        font-weight: 600;
+        padding: 0.2rem 0.55rem;
+        border-radius: 999px;
+        align-self: flex-start;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+    .kpi-trend--up      { background: #f0f5ec; color: #5a7a4a; }
+    .kpi-trend--down    { background: #fdf0ee; color: #a84040; }
+    .kpi-trend--neutral { background: #f2ede8; color: #7a6e64; }
+
+    /* ── Charts grid ── */
+    .charts-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+    @@media (max-width: 900px) { .charts-grid { grid-template-columns: 1fr; } }
+
+    .chart-body {
+        padding: 1.25rem 1.5rem 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 220px;
+    }
+    .chart-body canvas { max-height: 200px; }
+
+    /* ── Dashboard grid ── */
+    .db-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+    }
+    @@media (max-width: 900px) { .db-grid { grid-template-columns: 1fr; } }
+
+    /* ── Panel ── */
+    .db-panel {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .db-panel--full { grid-column: 1 / -1; }
+
+    .db-panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.95rem 1.25rem;
+        border-bottom: 1px solid #f1f5f9;
+    }
+    .db-panel-title {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: #0f172a;
+    }
+    .db-panel-title svg { color: #94a3b8; }
+
+    .db-panel-badge {
+        font-size: 0.68rem;
+        font-weight: 600;
+        padding: 0.2rem 0.6rem;
+        border-radius: 999px;
+        background: #f1f5f9;
+        color: #64748b;
+    }
+    .db-panel-badge--amber { background: #fdf4e8; color: #9d6a2a; }
+    .db-panel-badge--red   { background: #fdf0ee; color: #a84040; }
+
+    .db-panel-body { padding: 0; }
+
+    /* ── Empty state ── */
+    .db-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 2.5rem 1rem;
+        color: #94a3b8;
+        font-size: 0.82rem;
+    }
+
+    /* ── Table ── */
+    .db-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.82rem;
+    }
+    .db-table thead tr {
+        border-bottom: 1px solid #f1f5f9;
+    }
+    .db-table th {
+        font-size: 0.68rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #94a3b8;
+        padding: 0.6rem 1.25rem;
+        text-align: left;
+        background: #fafafa;
+    }
+    .db-table td {
+        padding: 0.7rem 1.25rem;
+        color: #1e293b;
+        border-bottom: 1px solid #f8fafc;
+        vertical-align: middle;
+    }
+    .db-table tbody tr:last-child td { border-bottom: none; }
+    .db-table tbody tr:hover td { background: #fafafa; }
+
+    .db-muted  { color: #94a3b8 !important; font-size: 0.78rem; }
+    .db-bold   { font-weight: 600; }
+
+    /* ── Tenant cell ── */
+    .db-tenant {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        font-weight: 500;
+    }
+    .db-avatar {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #c4944a, #8b6434);
+        color: #fff;
+        font-size: 0.68rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+    .db-avatar--red { background: linear-gradient(135deg, #c06050, #8b3030); }
+
+    /* ── Inline badges ── */
+    .db-badge {
+        display: inline-flex;
+        align-items: center;
+        font-size: 0.7rem;
+        font-weight: 600;
+        padding: 0.22rem 0.6rem;
+        border-radius: 5px;
+        white-space: nowrap;
+    }
+    .db-badge--amber   { background: #fdf4e8; color: #9d6a2a; }
+    .db-badge--red     { background: #fdf0ee; color: #a84040; }
+    .db-badge--open    { background: #fdf0ee; color: #a84040; }
+    .db-badge--assigned{ background: #fdf4e8; color: #9d6a2a; }
+    .db-badge--inprogress { background: #f2ede8; color: #8b7355; }
+    .db-badge--completed  { background: #f0f5ec; color: #5a7a4a; }
+    .db-badge--default    { background: #f2ede8; color: #7a6e64; }
+</style>
+
+@code {
+    bool loading = true;
+    bool _chartsRendered = false;
+    int totalProperties, activeLeases, openWorkOrders;
+    int totalUnits, occupiedUnits;
+    decimal occupancyRate;
+    List<Lease> expiringLeases = new();
+    List<MaintenanceRequest> recentMaintenance = new();
+    List<(Tenant, Lease, decimal)> delinquentAccounts = new();
+    Dictionary<string, int> statusCounts = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var properties = await PropertyService.GetAllAsync();
+        totalProperties = properties.Count(p => p.IsActive);
+
+        var allUnits = properties.SelectMany(p => p.Units).Where(u => u.IsActive).ToList();
+        totalUnits = allUnits.Count;
+        occupiedUnits = allUnits.Count(u => u.IsOccupied);
+        occupancyRate = totalUnits == 0 ? 0 : Math.Round((decimal)occupiedUnits / totalUnits * 100, 1);
+
+        var leases = await LeaseService.GetAllAsync();
+        activeLeases = leases.Count(l => l.Status == LeaseStatus.Active);
+        expiringLeases = await LeaseService.GetExpiringSoonAsync();
+
+        var allMaintenance = await MaintenanceService.GetAllAsync();
+        openWorkOrders = allMaintenance.Count(m => m.Status is MaintenanceStatus.Open or MaintenanceStatus.Assigned);
+        recentMaintenance = allMaintenance.Take(5).ToList();
+
+        statusCounts = new Dictionary<string, int>
+        {
+            ["Open"]        = allMaintenance.Count(m => m.Status == MaintenanceStatus.Open),
+            ["Assigned"]    = allMaintenance.Count(m => m.Status == MaintenanceStatus.Assigned),
+            ["In Progress"] = allMaintenance.Count(m => m.Status == MaintenanceStatus.InProgress),
+            ["Completed"]   = allMaintenance.Count(m => m.Status == MaintenanceStatus.Completed)
+        };
+
+        delinquentAccounts = await RentPaymentService.GetDelinquentAccountsAsync();
+        loading = false;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!loading && !_chartsRendered)
+        {
+            _chartsRendered = true;
+            await JS.InvokeVoidAsync("createDoughnutChart",
+                "occupancyChart",
+                new[] { "Occupied", "Vacant" },
+                new[] { occupiedUnits, totalUnits - occupiedUnits },
+                new[] { "#c4944a", "#e3ddd5" });
+
+            await JS.InvokeVoidAsync("createBarChart",
+                "maintenanceChart",
+                new[] { "Open", "Assigned", "In Progress", "Completed" },
+                new[] { statusCounts["Open"], statusCounts["Assigned"], statusCounts["In Progress"], statusCounts["Completed"] },
+                new[] { "#b85c50", "#c4944a", "#8b7355", "#6a8f5a" });
+        }
+    }
+
+    string GetStatusClass(MaintenanceStatus s) => s switch
+    {
+        MaintenanceStatus.Open       => "db-badge--open",
+        MaintenanceStatus.Assigned   => "db-badge--assigned",
+        MaintenanceStatus.InProgress => "db-badge--inprogress",
+        MaintenanceStatus.Completed  => "db-badge--completed",
+        _                            => "db-badge--default"
+    };
+}

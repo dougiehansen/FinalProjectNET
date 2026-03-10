@@ -1,0 +1,245 @@
+@page "/leases"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Administrator,PropertyManager")]
+@inject ILeaseService LeaseService
+@inject ITenantService TenantService
+@inject IUnitService UnitService
+@inject IPropertyService PropertyService
+
+<PageTitle>Leases - PropertyMS</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="fw-bold mb-0">Lease Management</h4>
+    <button class="btn btn-primary" @onclick="OpenCreateForm">+ Create Lease</button>
+</div>
+
+@if (!string.IsNullOrEmpty(successMsg))
+{
+    <div class="alert alert-success alert-dismissible">@successMsg
+        <button type="button" class="btn-close" @onclick="() => successMsg = string.Empty"></button>
+    </div>
+}
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        @if (loading)
+        {
+            <div class="d-flex justify-content-center py-4"><div class="spinner-border text-primary"></div></div>
+        }
+        else
+        {
+            <table class="table mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Tenant</th><th>Property</th><th>Unit</th><th>Rent/mo</th>
+                        <th>Start</th><th>End</th><th>Status</th><th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var l in leases)
+                    {
+                        <tr class="@(l.IsExpiringSoon ? "table-warning" : "")">
+                            <td>@l.Tenant.FullName</td>
+                            <td>@l.Unit.Property.Name</td>
+                            <td>@l.Unit.UnitNumber</td>
+                            <td>&#8364;@l.MonthlyRent.ToString("N2")</td>
+                            <td>@l.StartDate.ToString("dd MMM yyyy")</td>
+                            <td>
+                                @l.EndDate.ToString("dd MMM yyyy")
+                                @if (l.IsExpiringSoon)
+                                {
+                                    <span class="badge bg-warning text-dark ms-1">Expiring Soon</span>
+                                }
+                            </td>
+                            <td><span class="badge @GetStatusBadge(l.Status)">@l.Status</span></td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary" @onclick="() => OpenEditForm(l)">Edit</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+@if (showForm)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal d-block">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(editing.Id == 0 ? "Create Lease" : "Edit Lease")</h5>
+                    <button type="button" class="btn-close" @onclick="() => showForm = false"></button>
+                </div>
+                <div class="modal-body">
+                    @if (!string.IsNullOrEmpty(formError))
+                    {
+                        <div class="alert alert-danger">@formError</div>
+                    }
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Tenant *</label>
+                            <select class="form-select" @bind="editing.TenantId">
+                                <option value="0">Select tenant...</option>
+                                @foreach (var t in allTenants)
+                                {
+                                    <option value="@t.Id">@t.FullName</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Property *</label>
+                            <select class="form-select" value="@selectedPropertyId" @onchange="OnPropertySelected">
+                                <option value="0">Select property...</option>
+                                @foreach (var p in allProperties)
+                                {
+                                    <option value="@p.Id">@p.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Unit *</label>
+                            <select class="form-select" @bind="editing.UnitId">
+                                <option value="0">Select unit...</option>
+                                @foreach (var u in availableUnits)
+                                {
+                                    <option value="@u.Id">@u.UnitNumber – @u.Type (&#8364;@u.MonthlyRent/mo)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Status</label>
+                            <select class="form-select" @bind="editing.Status">
+                                @foreach (var s in Enum.GetValues<LeaseStatus>())
+                                {
+                                    <option value="@s">@s</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Start Date *</label>
+                            <input class="form-control" type="date" @bind="editing.StartDate" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">End Date *</label>
+                            <input class="form-control" type="date" @bind="editing.EndDate" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Monthly Rent (&#8364;) *</label>
+                            <input class="form-control" type="number" @bind="editing.MonthlyRent" step="0.01" min="0" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Security Deposit (&#8364;)</label>
+                            <input class="form-control" type="number" @bind="editing.SecurityDeposit" step="0.01" min="0" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Notes</label>
+                            <textarea class="form-control" rows="2" @bind="editing.Notes"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => showForm = false">Cancel</button>
+                    <button class="btn btn-primary" @onclick="Save">Save Lease</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    bool loading = true, showForm;
+    List<Lease> leases = new();
+    List<Tenant> allTenants = new();
+    List<Property> allProperties = new();
+    List<Unit> availableUnits = new();
+    Lease editing = new();
+    int selectedPropertyId;
+    string successMsg = string.Empty, formError = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+        allTenants = await TenantService.GetAllAsync();
+        allProperties = await PropertyService.GetAllAsync();
+        loading = false;
+    }
+
+    async Task LoadData() => leases = await LeaseService.GetAllAsync();
+
+    void OpenCreateForm()
+    {
+        editing = new Lease { StartDate = DateTime.Today, EndDate = DateTime.Today.AddYears(1) };
+        selectedPropertyId = 0;
+        availableUnits = new();
+        formError = string.Empty;
+        showForm = true;
+    }
+
+    async Task OpenEditForm(Lease l)
+    {
+        editing = new Lease
+        {
+            Id = l.Id, TenantId = l.TenantId, UnitId = l.UnitId,
+            StartDate = l.StartDate, EndDate = l.EndDate,
+            MonthlyRent = l.MonthlyRent, SecurityDeposit = l.SecurityDeposit,
+            Status = l.Status, Notes = l.Notes
+        };
+        selectedPropertyId = l.Unit.PropertyId;
+        availableUnits = await UnitService.GetByPropertyAsync(selectedPropertyId);
+        formError = string.Empty;
+        showForm = true;
+    }
+
+    async Task OnPropertySelected(ChangeEventArgs e)
+    {
+        selectedPropertyId = int.Parse(e.Value?.ToString() ?? "0");
+        availableUnits = selectedPropertyId > 0
+            ? await UnitService.GetByPropertyAsync(selectedPropertyId)
+            : new();
+        editing.UnitId = 0;
+    }
+
+    async Task Save()
+    {
+        if (editing.TenantId == 0 || editing.UnitId == 0 || editing.MonthlyRent <= 0)
+        {
+            formError = "Tenant, unit, and a positive monthly rent are required.";
+            return;
+        }
+        if (editing.EndDate <= editing.StartDate)
+        {
+            formError = "End date must be after start date.";
+            return;
+        }
+
+        if (editing.Id == 0)
+        {
+            var hasActive = await LeaseService.UnitHasActiveLease(editing.UnitId);
+            if (hasActive)
+            {
+                formError = "This unit already has an active lease. Select a different unit or review the existing lease.";
+                return;
+            }
+            await LeaseService.CreateAsync(editing);
+        }
+        else
+        {
+            await LeaseService.UpdateAsync(editing);
+        }
+
+        showForm = false;
+        successMsg = "Lease saved successfully.";
+        await LoadData();
+    }
+
+    string GetStatusBadge(LeaseStatus s) => s switch
+    {
+        LeaseStatus.Active => "bg-success",
+        LeaseStatus.PendingRenewal => "bg-warning text-dark",
+        LeaseStatus.Expired => "bg-secondary",
+        LeaseStatus.Terminated => "bg-danger",
+        _ => "bg-secondary"
+    };
+}

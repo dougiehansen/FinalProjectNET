@@ -1,0 +1,285 @@
+@page "/properties"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Administrator,PropertyManager")]
+@inject IPropertyService PropertyService
+@inject IUnitService UnitService
+@inject NavigationManager Nav
+
+<PageTitle>Properties - PropertyMS</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="fw-bold mb-0">Properties &amp; Units</h4>
+    <button class="btn btn-primary" @onclick="() => OpenPropertyForm()">+ Add Property</button>
+</div>
+
+@if (!string.IsNullOrEmpty(successMsg))
+{
+    <div class="alert alert-success alert-dismissible">@successMsg <button type="button" class="btn-close" @onclick="() => successMsg = string.Empty"></button></div>
+}
+
+@if (loading)
+{
+    <div class="d-flex justify-content-center py-5"><div class="spinner-border text-primary"></div></div>
+}
+else
+{
+    @foreach (var prop in properties)
+    {
+        <div class="card border-0 shadow-sm mb-3">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <div>
+                    <strong>@prop.Name</strong>
+                    <span class="text-muted small ms-2">@prop.Address, @prop.City @prop.ZipCode</span>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-primary" @onclick="() => OpenPropertyForm(prop)">Edit</button>
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => AddUnit(prop.Id)">+ Unit</button>
+                    @if (prop.IsActive)
+                    {
+                        <button class="btn btn-sm btn-outline-danger" @onclick="() => DeactivateProperty(prop.Id)">Deactivate</button>
+                    }
+                </div>
+            </div>
+            <div class="card-body p-0">
+                @if (!prop.Units.Any(u => u.IsActive))
+                {
+                    <p class="text-muted p-3 mb-0 small">No units added yet.</p>
+                }
+                else
+                {
+                    <table class="table table-sm mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Unit</th><th>Type</th><th>Beds</th><th>Baths</th>
+                                <th>Area (m²)</th><th>Rent</th><th>Status</th><th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var unit in prop.Units.Where(u => u.IsActive).OrderBy(u => u.UnitNumber))
+                            {
+                                <tr>
+                                    <td>@unit.UnitNumber</td>
+                                    <td>@unit.Type</td>
+                                    <td>@unit.Bedrooms</td>
+                                    <td>@unit.Bathrooms</td>
+                                    <td>@unit.FloorArea</td>
+                                    <td>&#8364;@unit.MonthlyRent.ToString("N2")</td>
+                                    <td>
+                                        <span class="badge @(unit.IsOccupied ? "bg-success" : "bg-secondary")">
+                                            @(unit.IsOccupied ? "Occupied" : "Vacant")
+                                        </span>
+                                    </td>
+                                    <td><button class="btn btn-sm btn-outline-primary" @onclick="() => EditUnit(unit)">Edit</button></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        </div>
+    }
+}
+
+<!-- Property Modal -->
+@if (showPropertyForm)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal d-block">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(editingProperty.Id == 0 ? "Add Property" : "Edit Property")</h5>
+                    <button type="button" class="btn-close" @onclick="() => showPropertyForm = false"></button>
+                </div>
+                <div class="modal-body">
+                    @if (!string.IsNullOrEmpty(formError))
+                    {
+                        <div class="alert alert-danger">@formError</div>
+                    }
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Property Name *</label>
+                            <input class="form-control" @bind="editingProperty.Name" placeholder="e.g. Riverside Apartments" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Address *</label>
+                            <input class="form-control" @bind="editingProperty.Address" placeholder="Street address" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">City</label>
+                            <input class="form-control" @bind="editingProperty.City" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">State/County</label>
+                            <input class="form-control" @bind="editingProperty.State" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Eircode / Postcode</label>
+                            <input class="form-control" @bind="editingProperty.ZipCode" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Contact Phone</label>
+                            <input class="form-control" @bind="editingProperty.ContactPhone" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Contact Email</label>
+                            <input class="form-control" type="email" @bind="editingProperty.ContactEmail" />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => showPropertyForm = false">Cancel</button>
+                    <button class="btn btn-primary" @onclick="SaveProperty">Save Property</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Unit Modal -->
+@if (showUnitForm)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal d-block">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(editingUnit.Id == 0 ? "Add Unit" : "Edit Unit")</h5>
+                    <button type="button" class="btn-close" @onclick="() => showUnitForm = false"></button>
+                </div>
+                <div class="modal-body">
+                    @if (!string.IsNullOrEmpty(unitFormError))
+                    {
+                        <div class="alert alert-danger">@unitFormError</div>
+                    }
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Unit Number *</label>
+                            <input class="form-control" @bind="editingUnit.UnitNumber" placeholder="e.g. 101" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Type</label>
+                            <input class="form-control" @bind="editingUnit.Type" placeholder="Apartment / Studio" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Floor Area (m²)</label>
+                            <input class="form-control" type="number" @bind="editingUnit.FloorArea" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Bedrooms</label>
+                            <input class="form-control" type="number" @bind="editingUnit.Bedrooms" min="0" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Bathrooms</label>
+                            <input class="form-control" type="number" @bind="editingUnit.Bathrooms" min="1" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Monthly Rent (&#8364;) *</label>
+                            <input class="form-control" type="number" @bind="editingUnit.MonthlyRent" step="0.01" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Amenities</label>
+                            <input class="form-control" @bind="editingUnit.Amenities" placeholder="Parking, Balcony, etc." />
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" @bind="editingUnit.IsOccupied" id="unitOccupied" />
+                                <label class="form-check-label" for="unitOccupied">Currently Occupied</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => showUnitForm = false">Cancel</button>
+                    <button class="btn btn-primary" @onclick="SaveUnit">Save Unit</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    bool loading = true;
+    List<Property> properties = new();
+    string successMsg = string.Empty, formError = string.Empty, unitFormError = string.Empty;
+
+    bool showPropertyForm, showUnitForm;
+    Property editingProperty = new();
+    Unit editingUnit = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+        loading = false;
+    }
+
+    async Task LoadData() => properties = await PropertyService.GetAllAsync();
+
+    void OpenPropertyForm(Property? prop = null)
+    {
+        editingProperty = prop != null
+            ? new Property { Id = prop.Id, Name = prop.Name, Address = prop.Address, City = prop.City, State = prop.State, ZipCode = prop.ZipCode, ContactPhone = prop.ContactPhone, ContactEmail = prop.ContactEmail, IsActive = prop.IsActive }
+            : new Property();
+        formError = string.Empty;
+        showPropertyForm = true;
+    }
+
+    async Task SaveProperty()
+    {
+        if (string.IsNullOrWhiteSpace(editingProperty.Name) || string.IsNullOrWhiteSpace(editingProperty.Address))
+        {
+            formError = "Name and address are required.";
+            return;
+        }
+        if (editingProperty.Id == 0)
+            await PropertyService.CreateAsync(editingProperty);
+        else
+            await PropertyService.UpdateAsync(editingProperty);
+
+        showPropertyForm = false;
+        successMsg = "Property saved successfully.";
+        await LoadData();
+    }
+
+    async Task DeactivateProperty(int id)
+    {
+        await PropertyService.DeactivateAsync(id);
+        successMsg = "Property deactivated.";
+        await LoadData();
+    }
+
+    void AddUnit(int propertyId)
+    {
+        editingUnit = new Unit { PropertyId = propertyId };
+        unitFormError = string.Empty;
+        showUnitForm = true;
+    }
+
+    void EditUnit(Unit u)
+    {
+        editingUnit = new Unit
+        {
+            Id = u.Id, PropertyId = u.PropertyId, UnitNumber = u.UnitNumber, Type = u.Type,
+            FloorArea = u.FloorArea, Bedrooms = u.Bedrooms, Bathrooms = u.Bathrooms,
+            MonthlyRent = u.MonthlyRent, Amenities = u.Amenities, IsOccupied = u.IsOccupied, IsActive = u.IsActive
+        };
+        unitFormError = string.Empty;
+        showUnitForm = true;
+    }
+
+    async Task SaveUnit()
+    {
+        if (string.IsNullOrWhiteSpace(editingUnit.UnitNumber) || editingUnit.MonthlyRent <= 0)
+        {
+            unitFormError = "Unit number and a positive monthly rent are required.";
+            return;
+        }
+        if (editingUnit.Id == 0)
+            await UnitService.CreateAsync(editingUnit);
+        else
+            await UnitService.UpdateAsync(editingUnit);
+
+        showUnitForm = false;
+        successMsg = "Unit saved successfully.";
+        await LoadData();
+    }
+}

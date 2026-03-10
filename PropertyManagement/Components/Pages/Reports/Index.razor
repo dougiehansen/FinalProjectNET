@@ -1,0 +1,276 @@
+@page "/reports"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Administrator,PropertyManager,AccountingTeam")]
+@inject IReportService ReportService
+@inject IPropertyService PropertyService
+@inject IJSRuntime JS
+
+<PageTitle>Reports - PropertyMS</PageTitle>
+
+<h4 class="fw-bold mb-4">Reports</h4>
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label fw-semibold">Report Type</label>
+                <select class="form-select" @bind="selectedReport">
+                    <option value="@ReportType.OccupancySummary">Occupancy Summary</option>
+                    <option value="@ReportType.RentRoll">Rent Roll</option>
+                    <option value="@ReportType.OutstandingPayments">Outstanding Payments</option>
+                    <option value="@ReportType.MaintenanceLog">Maintenance Log</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-semibold">Property (optional)</label>
+                <select class="form-select" @bind="selectedPropertyId">
+                    <option value="0">All Properties</option>
+                    @foreach (var p in properties)
+                    {
+                        <option value="@p.Id">@p.Name</option>
+                    }
+                </select>
+            </div>
+            @if (selectedReport == ReportType.MaintenanceLog)
+            {
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold">From</label>
+                    <input class="form-control" type="date" @bind="dateFrom" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold">To</label>
+                    <input class="form-control" type="date" @bind="dateTo" />
+                </div>
+            }
+            <div class="col-auto d-flex gap-2">
+                <button class="btn btn-primary" @onclick="RunReport">Generate</button>
+                @if (hasData)
+                {
+                    <button class="btn btn-outline-success" @onclick="ExportExcel">&#128196; Export Excel</button>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (loading)
+{
+    <div class="d-flex justify-content-center py-4"><div class="spinner-border text-primary"></div></div>
+}
+else if (hasRun && !hasData)
+{
+    <div class="alert alert-info">No records found for the selected filters. Try adjusting your filters.</div>
+}
+else if (hasData)
+{
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white fw-semibold">@GetReportTitle()</div>
+        <div class="card-body p-0">
+
+            @if (selectedReport == ReportType.OccupancySummary && occupancyRows.Any())
+            {
+                <table class="table mb-0">
+                    <thead class="table-light">
+                        <tr><th>Property</th><th>Total Units</th><th>Occupied</th><th>Vacant</th><th>Occupancy Rate</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in occupancyRows)
+                        {
+                            <tr>
+                                <td>@r.Property</td>
+                                <td>@r.TotalUnits</td>
+                                <td class="text-success">@r.Occupied</td>
+                                <td class="text-danger">@r.Vacant</td>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="progress flex-grow-1" style="height:8px;min-width:80px">
+                                            <div class="progress-bar bg-success" style="width:@r.OccupancyRate%"></div>
+                                        </div>
+                                        <span>@r.OccupancyRate%</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+
+            @if (selectedReport == ReportType.RentRoll && rentRollRows.Any())
+            {
+                <table class="table mb-0">
+                    <thead class="table-light">
+                        <tr><th>Property</th><th>Unit</th><th>Tenant</th><th>Monthly Rent</th><th>Lease Start</th><th>Lease End</th><th>Status</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in rentRollRows)
+                        {
+                            <tr>
+                                <td>@r.Property</td>
+                                <td>@r.Unit</td>
+                                <td>@r.Tenant</td>
+                                <td>&#8364;@r.MonthlyRent.ToString("N2")</td>
+                                <td>@r.LeaseStart.ToString("dd MMM yyyy")</td>
+                                <td>@r.LeaseEnd.ToString("dd MMM yyyy")</td>
+                                <td><span class="badge bg-success">@r.Status</span></td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot class="table-light fw-bold">
+                        <tr>
+                            <td colspan="3">Total Monthly Rent</td>
+                            <td>&#8364;@rentRollRows.Sum(r => r.MonthlyRent).ToString("N2")</td>
+                            <td colspan="3"></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            }
+
+            @if (selectedReport == ReportType.OutstandingPayments && outstandingRows.Any())
+            {
+                <table class="table mb-0">
+                    <thead class="table-light">
+                        <tr><th>Tenant</th><th>Unit</th><th>Property</th><th>Monthly Rent</th><th>Total Paid</th><th>Outstanding</th><th>Days Overdue</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in outstandingRows)
+                        {
+                            <tr>
+                                <td>@r.Tenant</td>
+                                <td>@r.Unit</td>
+                                <td>@r.Property</td>
+                                <td>&#8364;@r.MonthlyRent.ToString("N2")</td>
+                                <td>&#8364;@r.TotalPaid.ToString("N2")</td>
+                                <td><span class="badge bg-danger">&#8364;@r.OutstandingBalance.ToString("N2")</span></td>
+                                <td>@r.DaysOverdue</td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot class="table-light fw-bold">
+                        <tr>
+                            <td colspan="5">Total Outstanding</td>
+                            <td>&#8364;@outstandingRows.Sum(r => r.OutstandingBalance).ToString("N2")</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            }
+
+            @if (selectedReport == ReportType.MaintenanceLog && maintenanceRows.Any())
+            {
+                <table class="table mb-0">
+                    <thead class="table-light">
+                        <tr><th>#</th><th>Property</th><th>Unit</th><th>Title</th><th>Urgency</th><th>Status</th><th>Assigned To</th><th>Submitted</th><th>Completed</th><th>Cost</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in maintenanceRows)
+                        {
+                            <tr>
+                                <td>@r.Id</td>
+                                <td>@r.Property</td>
+                                <td>@r.Unit</td>
+                                <td>@r.Title</td>
+                                <td><span class="badge @GetUrgencyBadge(r.Urgency)">@r.Urgency</span></td>
+                                <td><span class="badge @GetStatusBadge(r.Status)">@r.Status</span></td>
+                                <td>@r.AssignedTo</td>
+                                <td>@r.Submitted.ToString("dd MMM yyyy")</td>
+                                <td>@(r.Completed?.ToString("dd MMM yyyy") ?? "–")</td>
+                                <td>@(r.Cost.HasValue ? $"€{r.Cost:N2}" : "–")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    bool loading, hasRun, hasData;
+    ReportType selectedReport = ReportType.OccupancySummary;
+    int selectedPropertyId;
+    DateTime? dateFrom, dateTo;
+    List<Property> properties = new();
+
+    List<OccupancyRow> occupancyRows = new();
+    List<RentRollRow> rentRollRows = new();
+    List<OutstandingPaymentRow> outstandingRows = new();
+    List<MaintenanceLogRow> maintenanceRows = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        properties = await PropertyService.GetAllAsync();
+    }
+
+    async Task RunReport()
+    {
+        loading = true;
+        hasRun = true;
+        occupancyRows = new(); rentRollRows = new(); outstandingRows = new(); maintenanceRows = new();
+
+        int? propId = selectedPropertyId > 0 ? selectedPropertyId : null;
+
+        switch (selectedReport)
+        {
+            case ReportType.OccupancySummary:
+                occupancyRows = await ReportService.GetOccupancyReportAsync(propId);
+                hasData = occupancyRows.Any();
+                break;
+            case ReportType.RentRoll:
+                rentRollRows = await ReportService.GetRentRollAsync(propId);
+                hasData = rentRollRows.Any();
+                break;
+            case ReportType.OutstandingPayments:
+                outstandingRows = await ReportService.GetOutstandingPaymentsAsync(propId);
+                hasData = outstandingRows.Any();
+                break;
+            case ReportType.MaintenanceLog:
+                maintenanceRows = await ReportService.GetMaintenanceLogAsync(propId, dateFrom, dateTo);
+                hasData = maintenanceRows.Any();
+                break;
+        }
+
+        loading = false;
+    }
+
+    async Task ExportExcel()
+    {
+        byte[] bytes = selectedReport switch
+        {
+            ReportType.OccupancySummary => ReportService.ExportToExcel(occupancyRows, "Occupancy Summary"),
+            ReportType.RentRoll => ReportService.ExportToExcel(rentRollRows, "Rent Roll"),
+            ReportType.OutstandingPayments => ReportService.ExportToExcel(outstandingRows, "Outstanding Payments"),
+            ReportType.MaintenanceLog => ReportService.ExportToExcel(maintenanceRows, "Maintenance Log"),
+            _ => Array.Empty<byte>()
+        };
+
+        var fileName = $"{GetReportTitle().Replace(" ", "_")}_{DateTime.Today:yyyyMMdd}.xlsx";
+        var base64 = Convert.ToBase64String(bytes);
+        await JS.InvokeVoidAsync("downloadFileFromBase64", base64, fileName,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    }
+
+    string GetReportTitle() => selectedReport switch
+    {
+        ReportType.OccupancySummary => "Occupancy Summary",
+        ReportType.RentRoll => "Rent Roll",
+        ReportType.OutstandingPayments => "Outstanding Payments",
+        ReportType.MaintenanceLog => "Maintenance Log",
+        _ => "Report"
+    };
+
+    string GetStatusBadge(MaintenanceStatus s) => s switch
+    {
+        MaintenanceStatus.Open => "bg-danger",
+        MaintenanceStatus.Assigned => "bg-warning text-dark",
+        MaintenanceStatus.InProgress => "bg-info",
+        MaintenanceStatus.Completed => "bg-success",
+        _ => "bg-secondary"
+    };
+
+    string GetUrgencyBadge(UrgencyLevel u) => u switch
+    {
+        UrgencyLevel.Emergency => "bg-danger",
+        UrgencyLevel.High => "bg-warning text-dark",
+        UrgencyLevel.Medium => "bg-info",
+        _ => "bg-secondary"
+    };
+}

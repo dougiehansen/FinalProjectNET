@@ -1,0 +1,189 @@
+@page "/admin/users"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Administrator")]
+@inject IUserService UserService
+
+<PageTitle>User Management - PropertyMS</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="fw-bold mb-0">User Management</h4>
+    <button class="btn btn-primary" @onclick="OpenCreateForm">+ Create User</button>
+</div>
+
+@if (!string.IsNullOrEmpty(successMsg))
+{
+    <div class="alert alert-success alert-dismissible">@successMsg
+        <button type="button" class="btn-close" @onclick="() => successMsg = string.Empty"></button>
+    </div>
+}
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        @if (loading)
+        {
+            <div class="d-flex justify-content-center py-4"><div class="spinner-border text-primary"></div></div>
+        }
+        else
+        {
+            <table class="table mb-0">
+                <thead class="table-light">
+                    <tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Last Login</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var u in users)
+                    {
+                        <tr>
+                            <td>@u.FullName</td>
+                            <td>@u.Email</td>
+                            <td><span class="badge @GetRoleBadge(u.Role)">@u.Role</span></td>
+                            <td><span class="badge @(u.IsActive ? "bg-success" : "bg-secondary")">@(u.IsActive ? "Active" : "Inactive")</span></td>
+                            <td class="text-muted small">@(u.LastLogin?.ToString("dd MMM yyyy HH:mm") ?? "Never")</td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary" @onclick="() => OpenEditForm(u)">Edit</button>
+                                @if (u.IsActive)
+                                {
+                                    <button class="btn btn-sm btn-outline-danger ms-1" @onclick="() => Deactivate(u.Id)">Deactivate</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+@if (showForm)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal d-block">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(editing.Id == 0 ? "Create User" : "Edit User")</h5>
+                    <button type="button" class="btn-close" @onclick="() => showForm = false"></button>
+                </div>
+                <div class="modal-body">
+                    @if (!string.IsNullOrEmpty(formError))
+                    {
+                        <div class="alert alert-danger">@formError</div>
+                    }
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">First Name *</label>
+                        <input class="form-control" @bind="editing.FirstName" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Last Name *</label>
+                        <input class="form-control" @bind="editing.LastName" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Email *</label>
+                        <input class="form-control" type="email" @bind="editing.Email" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">
+                            @(editing.Id == 0 ? "Password *" : "New Password (leave blank to keep current)")
+                        </label>
+                        <input class="form-control" type="password" @bind="password" autocomplete="new-password" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Role *</label>
+                        <select class="form-select" @bind="editing.Role">
+                            @foreach (var r in Enum.GetValues<UserRole>())
+                            {
+                                <option value="@r">@r</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" @bind="editing.IsActive" id="userActive" />
+                        <label class="form-check-label" for="userActive">Account Active</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => showForm = false">Cancel</button>
+                    <button class="btn btn-primary" @onclick="Save">Save User</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    bool loading = true, showForm;
+    List<ApplicationUser> users = new();
+    ApplicationUser editing = new();
+    string password = string.Empty;
+    string successMsg = string.Empty, formError = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        users = await UserService.GetAllAsync();
+        loading = false;
+    }
+
+    void OpenCreateForm()
+    {
+        editing = new ApplicationUser { IsActive = true };
+        password = string.Empty;
+        formError = string.Empty;
+        showForm = true;
+    }
+
+    void OpenEditForm(ApplicationUser u)
+    {
+        editing = new ApplicationUser
+        {
+            Id = u.Id, FirstName = u.FirstName, LastName = u.LastName,
+            Email = u.Email, Role = u.Role, IsActive = u.IsActive, PasswordHash = u.PasswordHash
+        };
+        password = string.Empty;
+        formError = string.Empty;
+        showForm = true;
+    }
+
+    async Task Save()
+    {
+        if (string.IsNullOrWhiteSpace(editing.FirstName) || string.IsNullOrWhiteSpace(editing.LastName) || string.IsNullOrWhiteSpace(editing.Email))
+        {
+            formError = "First name, last name, and email are required.";
+            return;
+        }
+        if (editing.Id == 0 && string.IsNullOrWhiteSpace(password))
+        {
+            formError = "Password is required for new users.";
+            return;
+        }
+
+        var emailExists = await UserService.EmailExistsAsync(editing.Email, editing.Id == 0 ? null : editing.Id);
+        if (emailExists)
+        {
+            formError = "This email address is already associated with another account.";
+            return;
+        }
+
+        if (editing.Id == 0)
+            await UserService.CreateAsync(editing, password);
+        else
+            await UserService.UpdateAsync(editing, string.IsNullOrWhiteSpace(password) ? null : password);
+
+        showForm = false;
+        successMsg = editing.Id == 0 ? "User created successfully." : "User updated successfully.";
+        users = await UserService.GetAllAsync();
+    }
+
+    async Task Deactivate(int id)
+    {
+        await UserService.DeactivateAsync(id);
+        successMsg = "User deactivated.";
+        users = await UserService.GetAllAsync();
+    }
+
+    string GetRoleBadge(UserRole r) => r switch
+    {
+        UserRole.Administrator => "bg-danger",
+        UserRole.PropertyManager => "bg-primary",
+        UserRole.MaintenanceStaff => "bg-warning text-dark",
+        UserRole.AccountingTeam => "bg-info",
+        _ => "bg-secondary"
+    };
+}

@@ -1,0 +1,400 @@
+@page
+@model PropertyManagement.Pages.Account.LoginModel
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login — KeyPort</title>
+    <link rel="stylesheet" href="/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            min-height: 100vh;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Full-page background image */
+        .bg-image {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+        }
+        .bg-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center;
+            display: block;
+        }
+        /* Dark gradient over image so left text is readable */
+        .bg-image::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(
+                105deg,
+                rgba(4, 10, 20, 0.62) 0%,
+                rgba(4, 10, 20, 0.35) 50%,
+                rgba(4, 10, 20, 0.15) 100%
+            );
+        }
+
+        /* ── Left: brand + tagline ── */
+        .left-content {
+            position: fixed;
+            left: 6%;
+            top: 3.5rem;
+            z-index: 2;
+            max-width: 400px;
+        }
+        .left-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.55rem;
+            margin-bottom: 1.5rem;
+        }
+        .left-brand-icon {
+            width: 34px;
+            height: 34px;
+            border-radius: 8px;
+            box-shadow: 0 3px 14px rgba(59,130,246,0.5);
+        }
+        .left-brand-name {
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: #fff;
+            letter-spacing: -0.3px;
+        }
+        .left-brand-name span { color: #e8c98a; }
+        .left-heading {
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: #fff;
+            line-height: 1.2;
+            letter-spacing: -0.7px;
+            margin-bottom: 0.75rem;
+            text-shadow: 0 2px 20px rgba(0,0,0,0.4);
+        }
+        .left-sub {
+            color: rgba(255,255,255,0.5);
+            font-size: 0.88rem;
+            line-height: 1.65;
+        }
+
+        /* ── Solid light login card ── */
+        .login-card {
+            position: relative;
+            z-index: 2;
+            width: 420px;
+            margin-right: 6%;
+            background: #faf7f2;
+            border-radius: 20px;
+            border: 1px solid #e3ddd5;
+            padding: 2rem 2.4rem 1.8rem;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+        }
+
+        @@media (max-width: 900px) {
+            body { justify-content: center; }
+            .left-content { display: none; }
+            .login-card { margin-right: 0; width: 92%; max-width: 420px; }
+        }
+
+        /* Form text */
+        .form-eyebrow {
+            font-size: 0.68rem;
+            font-weight: 700;
+            color: #c4944a;
+            text-transform: uppercase;
+            letter-spacing: 1.4px;
+            margin-bottom: 0.3rem;
+        }
+        .form-title {
+            font-size: 1.55rem;
+            font-weight: 800;
+            color: #0a0f1e;
+            letter-spacing: -0.5px;
+            line-height: 1.2;
+            margin-bottom: 0.25rem;
+        }
+        .form-subtitle {
+            color: #94a3b8;
+            font-size: 0.82rem;
+            margin-bottom: 1.2rem;
+        }
+
+        /* Fields */
+        .field-group { margin-bottom: 0.75rem; }
+        .field-label {
+            display: block;
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: #64748b;
+            letter-spacing: 0.3px;
+            margin-bottom: 0.4rem;
+        }
+        .field-wrap { position: relative; }
+        .field-input {
+            width: 100%;
+            padding: 0.65rem 2.7rem 0.65rem 1rem;
+            background: #f0ebe3;
+            border: 1.5px solid #e3ddd5;
+            border-radius: 10px;
+            color: #1c1814;
+            font-size: 0.9rem;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+        }
+        .field-input::placeholder { color: #cbd5e1; }
+        .field-input:focus {
+            border-color: #c4944a;
+            box-shadow: 0 0 0 3px rgba(196,148,74,0.12);
+            background: #fff;
+        }
+        .field-input.input-validation-error { border-color: #ef4444; }
+        .field-icon {
+            position: absolute;
+            right: 0.9rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #cbd5e1;
+            font-size: 0.82rem;
+            pointer-events: none;
+        }
+        .field-error { color: #ef4444; font-size: 0.76rem; margin-top: 0.3rem; display: block; }
+
+        .error-banner {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #b91c1c;
+            border-radius: 9px;
+            padding: 0.7rem 0.9rem;
+            font-size: 0.84rem;
+            margin-bottom: 1.2rem;
+        }
+
+        /* Social buttons */
+        .social-buttons {
+            display: flex;
+            gap: 0.65rem;
+            margin-bottom: 1rem;
+        }
+        .btn-social {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.6rem 0.5rem;
+            background: #f0ebe3;
+            border: 1.5px solid #e3ddd5;
+            border-radius: 10px;
+            color: #3d3530;
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s, border-color 0.2s, transform 0.15s;
+            text-decoration: none;
+            white-space: nowrap;
+        }
+        .btn-social:hover {
+            background: #e8e2d8;
+            border-color: #d4cdc4;
+            transform: translateY(-1px);
+            color: #1c1814;
+        }
+        .btn-social:active { transform: translateY(0); }
+        .btn-social svg { flex-shrink: 0; }
+
+        .social-divider {
+            display: flex;
+            align-items: center;
+            gap: 0.7rem;
+            margin-bottom: 1rem;
+        }
+        .social-divider::before, .social-divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: #e2e8f0;
+        }
+        .social-divider span { color: #94a3b8; font-size: 0.7rem; white-space: nowrap; }
+
+        /* Button */
+        .btn-signin {
+            width: 100%;
+            padding: 0.72rem;
+            background: #2a2118;
+            color: #fff;
+            font-size: 0.88rem;
+            font-weight: 700;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            letter-spacing: 0.2px;
+            transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+            margin-top: 0.5rem;
+            box-shadow: 0 4px 14px rgba(42,33,24,0.3);
+        }
+        .btn-signin:hover {
+            background: #1c1814;
+            transform: translateY(-1px);
+            box-shadow: 0 8px 20px rgba(42,33,24,0.4);
+        }
+        .btn-signin:active { transform: translateY(0); }
+
+        /* Divider */
+        .divider {
+            display: flex;
+            align-items: center;
+            gap: 0.7rem;
+            margin: 1rem 0 0.9rem;
+        }
+        .divider::before, .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: #e2e8f0;
+        }
+        .divider span { color: #94a3b8; font-size: 0.7rem; white-space: nowrap; }
+
+        /* Demo accounts */
+        .demo-box {
+            background: #f0ebe3;
+            border: 1px solid #e3ddd5;
+            border-radius: 10px;
+            padding: 0.65rem 0.9rem;
+        }
+        .demo-box-title {
+            font-size: 0.62rem;
+            font-weight: 700;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.9px;
+            margin-bottom: 0.4rem;
+        }
+        .demo-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.2rem 0;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .demo-row:last-child { border-bottom: none; }
+        .demo-role { font-size: 0.72rem; font-weight: 600; color: #64748b; min-width: 115px; }
+        .demo-creds { font-size: 0.68rem; color: #94a3b8; font-family: 'Consolas', monospace; }
+    </style>
+</head>
+<body>
+
+    <!-- Full-page background image -->
+    <div class="bg-image">
+        <img src="/images/loginimage.png" alt="" />
+    </div>
+
+    <!-- Left: brand + tagline -->
+    <div class="left-content">
+        <div class="left-brand">
+            <img src="/images/keyport-icon.svg" alt="KeyPort" class="left-brand-icon" />
+            <span class="left-brand-name">Key<span>Port</span></span>
+        </div>
+        <div class="left-heading">Property management,<br />done differently.</div>
+        <div class="left-sub">Tenants, leases, maintenance &amp; financials —<br />all in one intelligent platform.</div>
+    </div>
+
+    <!-- Glassmorphic login card -->
+    <div class="login-card">
+        <div class="form-eyebrow">Welcome back</div>
+        <div class="form-title">Sign in to KeyPort</div>
+        <div class="form-subtitle">Enter your credentials to continue</div>
+
+        @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+        {
+            <div class="error-banner">&#9888;&nbsp; @Model.ErrorMessage</div>
+        }
+
+        <!-- Social login -->
+        <div class="social-buttons">
+            <a href="#" class="btn-social">
+                <!-- Google G -->
+                <svg width="17" height="17" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                    <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                    <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                    <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                    <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                </svg>
+                Google
+            </a>
+            <a href="#" class="btn-social">
+                <!-- Microsoft squares -->
+                <svg width="16" height="16" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="0"  y="0"  width="9.5" height="9.5" fill="#F25022"/>
+                    <rect x="11" y="0"  width="9.5" height="9.5" fill="#7FBA00"/>
+                    <rect x="0"  y="11" width="9.5" height="9.5" fill="#00A4EF"/>
+                    <rect x="11" y="11" width="9.5" height="9.5" fill="#FFB900"/>
+                </svg>
+                Microsoft
+            </a>
+        </div>
+
+        <div class="social-divider"><span>or sign in with email</span></div>
+
+        <form method="post">
+            <div asp-validation-summary="ModelOnly" class="field-error mb-3"></div>
+
+            <div class="field-group">
+                <label asp-for="Input.Email" class="field-label">Email address</label>
+                <div class="field-wrap">
+                    <input asp-for="Input.Email" class="field-input" placeholder="you@example.com" autocomplete="username" />
+                    <span class="field-icon">&#9993;</span>
+                </div>
+                <span asp-validation-for="Input.Email" class="field-error"></span>
+            </div>
+
+            <div class="field-group">
+                <label asp-for="Input.Password" class="field-label">Password</label>
+                <div class="field-wrap">
+                    <input asp-for="Input.Password" type="password" class="field-input" placeholder="••••••••" autocomplete="current-password" />
+                    <span class="field-icon">&#128274;</span>
+                </div>
+                <span asp-validation-for="Input.Password" class="field-error"></span>
+            </div>
+
+            <button type="submit" class="btn-signin">Sign in &rarr;</button>
+        </form>
+
+        <div class="divider"><span>Demo accounts</span></div>
+
+        <div class="demo-box">
+            <div class="demo-box-title">Quick access</div>
+            <div class="demo-row">
+                <span class="demo-role">Administrator</span>
+                <span class="demo-creds">admin@property.com / Admin123!</span>
+            </div>
+            <div class="demo-row">
+                <span class="demo-role">Property Manager</span>
+                <span class="demo-creds">manager@property.com / Manager123!</span>
+            </div>
+            <div class="demo-row">
+                <span class="demo-role">Maintenance</span>
+                <span class="demo-creds">maintenance@property.com / Maint123!</span>
+            </div>
+            <div class="demo-row">
+                <span class="demo-role">Accounting</span>
+                <span class="demo-creds">accounting@property.com / Acct123!</span>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

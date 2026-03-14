@@ -6,130 +6,556 @@
 
 <PageTitle>Properties - PropertyMS</PageTitle>
 
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h4 class="fw-bold mb-0">Properties &amp; Units</h4>
-    <button class="btn btn-primary" @onclick="() => OpenPropertyForm()">+ Add Property</button>
-</div>
+<style>
+    :root {
+        --ap-blue: #007AFF; --ap-blue-lt: #E8F2FF;
+        --ap-green: #34C759; --ap-green-lt: #E8F8EC;
+        --ap-red: #FF3B30;   --ap-red-lt: #FFF0EF;
+        --ap-orange: #FF9500; --ap-orange-lt: #FFF4E5;
+        --ap-gray1: #8E8E93; --ap-gray6: #F2F2F7;
+        --ap-sep: #E5E5EA;
+        --r-lg: 16px; --r-md: 12px; --r-sm: 8px;
+        --shadow: 0 2px 12px rgba(0,0,0,.07), 0 1px 3px rgba(0,0,0,.05);
+        --shadow-modal: 0 24px 60px rgba(0,0,0,.18), 0 8px 20px rgba(0,0,0,.10);
+        --t: all .2s cubic-bezier(.4,0,.2,1);
+    }
+    .pm { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif; }
 
-@if (!string.IsNullOrEmpty(successMsg))
-{
-    <div class="alert alert-success alert-dismissible">@successMsg <button type="button" class="btn-close" @onclick="() => successMsg = string.Empty"></button></div>
-}
+    /* Header */
+    .pm-hdr { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; margin-bottom:28px; }
+    .pm-hdr h1 { font-size:28px; font-weight:700; letter-spacing:-.5px; color:#1C1C1E; margin:0; }
+    .pm-hdr p  { font-size:14px; color:var(--ap-gray1); margin:2px 0 0; }
 
-@if (loading)
-{
-    <div class="d-flex justify-content-center py-5"><div class="spinner-border text-primary"></div></div>
-}
-else
-{
-    @foreach (var prop in properties)
-    {
-        <div class="card border-0 shadow-sm mb-3">
-            <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                <div>
-                    <strong>@prop.Name</strong>
-                    <span class="text-muted small ms-2">@prop.Address, @prop.City @prop.ZipCode</span>
-                </div>
-                <div class="d-flex gap-2">
-                    <button class="btn btn-sm btn-outline-primary" @onclick="() => OpenPropertyForm(prop)">Edit</button>
-                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => AddUnit(prop.Id)">+ Unit</button>
-                    @if (prop.IsActive)
-                    {
-                        <button class="btn btn-sm btn-outline-danger" @onclick="() => DeactivateProperty(prop.Id)">Deactivate</button>
-                    }
-                </div>
-            </div>
-            <div class="card-body p-0">
-                @if (!prop.Units.Any(u => u.IsActive))
-                {
-                    <p class="text-muted p-3 mb-0 small">No units added yet.</p>
-                }
-                else
-                {
-                    <table class="table table-sm mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Unit</th><th>Type</th><th>Beds</th><th>Baths</th>
-                                <th>Area (m²)</th><th>Rent</th><th>Status</th><th></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var unit in prop.Units.Where(u => u.IsActive).OrderBy(u => u.UnitNumber))
-                            {
-                                <tr>
-                                    <td>@unit.UnitNumber</td>
-                                    <td>@unit.Type</td>
-                                    <td>@unit.Bedrooms</td>
-                                    <td>@unit.Bathrooms</td>
-                                    <td>@unit.FloorArea</td>
-                                    <td>&#8364;@unit.MonthlyRent.ToString("N2")</td>
-                                    <td>
-                                        <span class="badge @(unit.IsOccupied ? "bg-success" : "bg-secondary")">
-                                            @(unit.IsOccupied ? "Occupied" : "Vacant")
-                                        </span>
-                                    </td>
-                                    <td><button class="btn btn-sm btn-outline-primary" @onclick="() => EditUnit(unit)">Edit</button></td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                }
+    /* Stats */
+    .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:24px; }
+    .stat-c { background:#fff; border-radius:var(--r-md); padding:16px 20px; box-shadow:var(--shadow); display:flex; align-items:center; gap:14px; transition:var(--t); }
+    .stat-c:hover { transform:translateY(-1px); box-shadow:0 4px 18px rgba(0,0,0,.10); }
+    .stat-ico { width:42px; height:42px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0; }
+    .si-blue   { background:var(--ap-blue-lt);   color:var(--ap-blue); }
+    .si-green  { background:var(--ap-green-lt);  color:var(--ap-green); }
+    .si-red    { background:var(--ap-red-lt);    color:var(--ap-red); }
+    .si-orange { background:var(--ap-orange-lt); color:var(--ap-orange); }
+    .stat-lbl { font-size:12px; color:var(--ap-gray1); font-weight:500; text-transform:uppercase; letter-spacing:.4px; }
+    .stat-val { font-size:22px; font-weight:700; color:#1C1C1E; line-height:1.1; }
+    .stat-sub { font-size:11px; color:var(--ap-gray1); margin-top:1px; }
+
+    /* Toolbar */
+    .toolbar { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:20px; }
+    .srch-wrap { position:relative; flex:1 1 240px; }
+    .srch-wrap svg { position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--ap-gray1); pointer-events:none; }
+    .srch-inp {
+        width:100%; padding:9px 12px 9px 38px; border:1.5px solid var(--ap-sep);
+        border-radius:var(--r-sm); font-size:14px; background:#fff; outline:none;
+        transition:var(--t); color:#1C1C1E; box-sizing:border-box;
+    }
+    .srch-inp:focus { border-color:var(--ap-blue); box-shadow:0 0 0 3px rgba(0,122,255,.12); }
+    .srch-inp::placeholder { color:#AEAEB2; }
+
+    .seg { display:flex; background:var(--ap-gray6); border-radius:var(--r-sm); padding:3px; gap:2px; }
+    .seg-btn {
+        padding:6px 14px; border:none; border-radius:6px; font-size:13px; font-weight:500;
+        background:transparent; color:var(--ap-gray1); cursor:pointer; transition:var(--t); white-space:nowrap;
+    }
+    .seg-btn.active { background:#fff; color:#1C1C1E; box-shadow:0 1px 4px rgba(0,0,0,.12); }
+    .srt-sel {
+        padding:8px 12px; border:1.5px solid var(--ap-sep); border-radius:var(--r-sm);
+        font-size:13px; background:#fff; color:#1C1C1E; outline:none; cursor:pointer; transition:var(--t);
+    }
+    .srt-sel:focus { border-color:var(--ap-blue); }
+    .btn-add-prop {
+        display:inline-flex; align-items:center; gap:6px; padding:9px 18px;
+        background:var(--ap-blue); color:#fff; border:none; border-radius:var(--r-sm);
+        font-size:14px; font-weight:600; cursor:pointer; transition:var(--t); white-space:nowrap;
+    }
+    .btn-add-prop:hover { background:#0066DD; transform:translateY(-1px); }
+    .icon-btn {
+        width:32px; height:32px; border-radius:var(--r-sm); display:flex; align-items:center;
+        justify-content:center; border:1.5px solid var(--ap-sep); background:#fff;
+        color:var(--ap-gray1); cursor:pointer; transition:var(--t); font-size:14px;
+    }
+    .icon-btn:hover { background:var(--ap-gray6); color:#1C1C1E; }
+    .icon-btn.danger:hover  { background:var(--ap-red-lt); color:var(--ap-red); border-color:var(--ap-red); }
+    .icon-btn.primary:hover { background:var(--ap-blue-lt); color:var(--ap-blue); border-color:var(--ap-blue); }
+
+    /* Property Card */
+    .prop-card { background:#fff; border-radius:var(--r-lg); box-shadow:var(--shadow); margin-bottom:16px; overflow:hidden; transition:var(--t); }
+    .prop-card:hover { box-shadow:0 4px 20px rgba(0,0,0,.09); }
+    .prop-card.inactive { opacity:.6; }
+
+    .prop-hdr { display:flex; align-items:center; padding:20px 24px; gap:16px; cursor:pointer; user-select:none; }
+    .prop-avatar {
+        width:48px; height:48px; border-radius:12px;
+        background:linear-gradient(135deg,var(--ap-blue) 0%,#5AC8FA 100%);
+        display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0;
+    }
+    .prop-info { flex:1; min-width:0; }
+    .prop-name { font-size:16px; font-weight:700; color:#1C1C1E; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .prop-addr { font-size:13px; color:var(--ap-gray1); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+    .prop-meta { display:flex; align-items:center; gap:20px; flex-shrink:0; }
+    .prop-chip { display:flex; flex-direction:column; align-items:center; padding:6px 14px; border-radius:var(--r-sm); background:var(--ap-gray6); }
+    .pc-val { font-size:15px; font-weight:700; color:#1C1C1E; }
+    .pc-lbl { font-size:10px; color:var(--ap-gray1); text-transform:uppercase; letter-spacing:.4px; }
+
+    .occ-wrap { display:flex; flex-direction:column; align-items:flex-end; gap:4px; }
+    .occ-track { width:80px; height:5px; background:var(--ap-sep); border-radius:99px; overflow:hidden; }
+    .occ-fill  { height:100%; border-radius:99px; background:var(--ap-green); transition:width .5s ease; }
+    .occ-pct   { font-size:12px; font-weight:600; color:var(--ap-gray1); }
+
+    .prop-actions { display:flex; align-items:center; gap:8px; margin-left:8px; }
+    .chevron { transition:transform .25s cubic-bezier(.4,0,.2,1); display:flex; align-items:center; }
+    .chevron.open { transform:rotate(90deg); }
+
+    /* Units */
+    .units-sec { border-top:1px solid var(--ap-sep); padding:16px 24px 20px; background:#FAFAFA; }
+    .units-bar { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; flex-wrap:wrap; gap:8px; }
+    .units-ttl { font-size:13px; font-weight:600; color:var(--ap-gray1); text-transform:uppercase; letter-spacing:.5px; }
+    .units-flt { display:flex; gap:6px; }
+    .uft-btn {
+        padding:4px 10px; border:1.5px solid var(--ap-sep); border-radius:99px;
+        font-size:12px; font-weight:500; background:#fff; color:var(--ap-gray1); cursor:pointer; transition:var(--t);
+    }
+    .uft-btn.active { border-color:var(--ap-blue); background:var(--ap-blue-lt); color:var(--ap-blue); }
+
+    .units-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:12px; }
+    .unit-card {
+        background:#fff; border-radius:var(--r-md); padding:16px;
+        border:1.5px solid var(--ap-sep); transition:var(--t);
+    }
+    .unit-card:hover { border-color:var(--ap-blue); box-shadow:0 0 0 3px rgba(0,122,255,.08); transform:translateY(-1px); }
+    .unit-num  { font-size:17px; font-weight:700; color:#1C1C1E; }
+    .unit-type { font-size:12px; color:var(--ap-gray1); margin-top:1px; }
+    .unit-dtls { display:flex; gap:10px; margin-top:10px; font-size:12px; color:#636366; }
+    .unit-rent { font-size:16px; font-weight:700; color:#1C1C1E; margin-top:10px; }
+    .unit-rent span { font-size:11px; font-weight:400; color:var(--ap-gray1); }
+    .unit-tags { margin-top:8px; display:flex; flex-wrap:wrap; gap:4px; }
+    .utag { padding:2px 8px; background:var(--ap-gray6); border-radius:99px; font-size:10px; color:#636366; font-weight:500; }
+    .unit-ftr { display:flex; align-items:center; justify-content:space-between; margin-top:12px; }
+    .sdot { display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600; }
+    .sdot::before { content:''; width:7px; height:7px; border-radius:50%; display:inline-block; }
+    .sdot.occ { color:var(--ap-green); }
+    .sdot.occ::before { background:var(--ap-green); }
+    .sdot.vac { color:var(--ap-gray1); }
+    .sdot.vac::before { background:#C7C7CC; }
+    .btn-eu {
+        padding:4px 10px; font-size:12px; font-weight:600; border-radius:6px;
+        border:1.5px solid var(--ap-blue); background:transparent; color:var(--ap-blue); cursor:pointer; transition:var(--t);
+    }
+    .btn-eu:hover { background:var(--ap-blue); color:#fff; }
+    .btn-au {
+        display:inline-flex; align-items:center; gap:6px; margin-top:12px; padding:8px 14px;
+        font-size:13px; font-weight:600; border-radius:var(--r-sm);
+        border:1.5px dashed var(--ap-blue); background:var(--ap-blue-lt); color:var(--ap-blue);
+        cursor:pointer; transition:var(--t); width:100%; justify-content:center; box-sizing:border-box;
+    }
+    .btn-au:hover { background:var(--ap-blue); color:#fff; border-style:solid; }
+    .empty-u { text-align:center; padding:24px; color:var(--ap-gray1); font-size:14px; }
+
+    /* Empty state */
+    .empty-state { text-align:center; padding:64px 24px; color:var(--ap-gray1); }
+    .empty-state .eico { font-size:52px; margin-bottom:12px; }
+    .empty-state h3 { font-size:18px; font-weight:600; color:#3A3A3C; margin:0 0 6px; }
+    .empty-state p  { font-size:14px; margin:0; }
+
+    /* Toast */
+    .toast-wrap { position:fixed; top:24px; right:24px; z-index:9999; display:flex; flex-direction:column; gap:10px; pointer-events:none; }
+    .toast-item {
+        background:#1C1C1E; color:#fff; padding:12px 18px; border-radius:var(--r-md);
+        font-size:14px; font-weight:500; box-shadow:var(--shadow-modal);
+        display:flex; align-items:center; gap:10px; pointer-events:all;
+        animation:slideR .25s cubic-bezier(.4,0,.2,1);
+    }
+    .toast-item.ok::before  { content:'✓'; font-weight:700; color:var(--ap-green); }
+    .toast-item.err::before { content:'✕'; font-weight:700; color:var(--ap-red); }
+    @@keyframes slideR { from{opacity:0;transform:translateX(40px)} to{opacity:1;transform:translateX(0)} }
+
+    /* Modal */
+    .mbk { position:fixed; inset:0; background:rgba(0,0,0,.4); backdrop-filter:blur(4px); z-index:1040; animation:fadeIn .2s ease; }
+    .msh { position:fixed; inset:0; z-index:1050; display:flex; align-items:center; justify-content:center; padding:24px; }
+    .mbox {
+        background:#fff; border-radius:20px; width:100%; max-width:560px;
+        box-shadow:var(--shadow-modal); overflow:hidden;
+        animation:scaleIn .22s cubic-bezier(.4,0,.2,1);
+    }
+    .mbox.sm { max-width:360px; }
+    @@keyframes fadeIn  { from{opacity:0} to{opacity:1} }
+    @@keyframes scaleIn { from{opacity:0;transform:scale(.95) translateY(10px)} to{opacity:1;transform:scale(1) translateY(0)} }
+    .mtop { display:flex; align-items:center; justify-content:space-between; padding:22px 24px 0; }
+    .mtop h2 { font-size:18px; font-weight:700; color:#1C1C1E; margin:0; }
+    .mcls {
+        width:30px; height:30px; border-radius:50%; background:var(--ap-gray6); border:none;
+        cursor:pointer; display:flex; align-items:center; justify-content:center;
+        font-size:16px; color:var(--ap-gray1); transition:var(--t);
+    }
+    .mcls:hover { background:var(--ap-sep); color:#1C1C1E; }
+    .mbdy { padding:20px 24px; }
+    .mftr { padding:0 24px 22px; display:flex; gap:10px; justify-content:flex-end; }
+    .mftr.center { justify-content:center; padding-top:20px; }
+
+    .fg { display:flex; flex-direction:column; gap:4px; }
+    .fl { font-size:13px; font-weight:600; color:#3A3A3C; }
+    .fi, .fsel {
+        padding:10px 13px; border:1.5px solid var(--ap-sep); border-radius:var(--r-sm);
+        font-size:14px; color:#1C1C1E; outline:none; transition:var(--t); background:#fff; width:100%; box-sizing:border-box;
+    }
+    .fi:focus, .fsel:focus { border-color:var(--ap-blue); box-shadow:0 0 0 3px rgba(0,122,255,.12); }
+    .fi::placeholder { color:#AEAEB2; }
+    .frow { display:grid; gap:14px; }
+    .frow.c2 { grid-template-columns:1fr 1fr; }
+    .frow.c3 { grid-template-columns:1fr 1fr 1fr; }
+    .frow.c4 { grid-template-columns:1fr 1fr 1fr 1fr; }
+    .ferr { font-size:12px; color:var(--ap-red); margin-top:10px; padding:8px 12px; background:var(--ap-red-lt); border-radius:var(--r-sm); }
+    .btn-cancel {
+        padding:10px 20px; border-radius:var(--r-sm); font-size:14px; font-weight:600;
+        border:1.5px solid var(--ap-sep); background:#fff; color:#3A3A3C; cursor:pointer; transition:var(--t);
+    }
+    .btn-cancel:hover { background:var(--ap-gray6); }
+    .btn-save {
+        padding:10px 24px; border-radius:var(--r-sm); font-size:14px; font-weight:600;
+        border:none; background:var(--ap-blue); color:#fff; cursor:pointer; transition:var(--t);
+    }
+    .btn-save:hover { background:#0066DD; }
+    .btn-danger {
+        padding:10px 24px; border-radius:var(--r-sm); font-size:14px; font-weight:600;
+        border:none; background:var(--ap-red); color:#fff; cursor:pointer; transition:var(--t);
+    }
+    .btn-danger:hover { background:#D70015; }
+
+    .tog-row { display:flex; align-items:center; justify-content:space-between; padding:12px 14px; background:var(--ap-gray6); border-radius:var(--r-sm); }
+    .tog-lbl { font-size:14px; font-weight:500; color:#1C1C1E; }
+    .tog-sub { font-size:12px; color:var(--ap-gray1); }
+    .ios-tog {
+        appearance:none; width:44px; height:26px; background:#C7C7CC;
+        border-radius:13px; cursor:pointer; position:relative; transition:background .2s; flex-shrink:0;
+    }
+    .ios-tog:checked { background:var(--ap-green); }
+    .ios-tog::after {
+        content:''; position:absolute; top:2px; left:2px;
+        width:22px; height:22px; border-radius:50%; background:#fff;
+        box-shadow:0 1px 4px rgba(0,0,0,.2); transition:transform .2s;
+    }
+    .ios-tog:checked::after { transform:translateX(18px); }
+
+    .conf-ico { font-size:40px; text-align:center; margin-bottom:10px; }
+    .conf-ttl { font-size:17px; font-weight:700; color:#1C1C1E; text-align:center; }
+    .conf-msg { font-size:14px; color:var(--ap-gray1); text-align:center; margin-top:6px; }
+
+    .skel { background:linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%); background-size:200% 100%; animation:shimmer 1.4s infinite; border-radius:8px; }
+    @@keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+    @@media(max-width:768px) {
+        .stats { grid-template-columns:1fr 1fr; }
+        .prop-meta { display:none; }
+        .frow.c3, .frow.c4 { grid-template-columns:1fr 1fr; }
+        .frow.c2 { grid-template-columns:1fr; }
+    }
+    @@media(max-width:480px) { .stats { grid-template-columns:1fr; } }
+</style>
+
+<div class="pm">
+
+    <!-- Toasts -->
+    <div class="toast-wrap">
+        @if (!string.IsNullOrEmpty(toastMsg))
+        {
+            <div class="toast-item @toastClass">@toastMsg</div>
+        }
+    </div>
+
+    <!-- Page Header -->
+    <div class="pm-hdr">
+        <div>
+            <h1>Properties &amp; Units</h1>
+            <p>@filteredProps.Count @(filteredProps.Count == 1 ? "property" : "properties") &nbsp;·&nbsp; @AllUnits.Count units total</p>
+        </div>
+        <button class="btn-add-prop" @onclick="() => OpenPropertyForm()">
+            <svg width="14" height="14" fill="none" viewBox="0 0 14 14"><path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            Add Property
+        </button>
+    </div>
+
+    <!-- Stats Strip -->
+    <div class="stats">
+        <div class="stat-c">
+            <div class="stat-ico si-blue">🏢</div>
+            <div>
+                <div class="stat-lbl">Properties</div>
+                <div class="stat-val">@ActivePropCount</div>
+                <div class="stat-sub">@properties.Count(p => !p.IsActive) inactive</div>
             </div>
         </div>
-    }
-}
+        <div class="stat-c">
+            <div class="stat-ico si-green">🏠</div>
+            <div>
+                <div class="stat-lbl">Total Units</div>
+                <div class="stat-val">@AllUnits.Count</div>
+                <div class="stat-sub">@OccupiedCount occupied</div>
+            </div>
+        </div>
+        <div class="stat-c">
+            <div class="stat-ico si-orange">📊</div>
+            <div>
+                <div class="stat-lbl">Occupancy</div>
+                <div class="stat-val">@OccRate%</div>
+                <div class="stat-sub">@VacantCount vacant</div>
+            </div>
+        </div>
+        <div class="stat-c">
+            <div class="stat-ico si-red">💶</div>
+            <div>
+                <div class="stat-lbl">Monthly Revenue</div>
+                <div class="stat-val">€@TotalRev.ToString("N0")</div>
+                <div class="stat-sub">from occupied units</div>
+            </div>
+        </div>
+    </div>
 
-<!-- Property Modal -->
-@if (showPropertyForm)
-{
-    <div class="modal-backdrop show"></div>
-    <div class="modal d-block">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">@(editingProperty.Id == 0 ? "Add Property" : "Edit Property")</h5>
-                    <button type="button" class="btn-close" @onclick="() => showPropertyForm = false"></button>
+    <!-- Toolbar -->
+    @{
+        var sAll  = "seg-btn" + (statusFilter == "all"      ? " active" : "");
+        var sAct  = "seg-btn" + (statusFilter == "active"   ? " active" : "");
+        var sInac = "seg-btn" + (statusFilter == "inactive" ? " active" : "");
+    }
+    <div class="toolbar">
+        <div class="srch-wrap">
+            <svg width="15" height="15" fill="none" viewBox="0 0 15 15">
+                <circle cx="6.5" cy="6.5" r="5" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M10.5 10.5l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <input class="srch-inp" placeholder="Search properties, cities, units…"
+                   value="@searchQ" @oninput="OnSearch" />
+        </div>
+
+        <div class="seg">
+            <button class="@sAll"  @onclick="FilterAll">All</button>
+            <button class="@sAct"  @onclick="FilterActive">Active</button>
+            <button class="@sInac" @onclick="FilterInactive">Inactive</button>
+        </div>
+
+        <select class="srt-sel" value="@sortBy" @onchange="OnSortChange">
+            <option value="name">Sort: Name</option>
+            <option value="city">Sort: City</option>
+            <option value="units">Sort: Units</option>
+            <option value="occ">Sort: Occupancy</option>
+            <option value="rev">Sort: Revenue</option>
+        </select>
+
+        <button class="icon-btn" title="Expand all" @onclick="ExpandAll">
+            <svg width="14" height="14" fill="none" viewBox="0 0 14 14"><path d="M1 4l6 6 6-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="icon-btn" title="Collapse all" @onclick="CollapseAll">
+            <svg width="14" height="14" fill="none" viewBox="0 0 14 14"><path d="M13 10l-6-6-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+    </div>
+
+    <!-- List -->
+    @if (loading)
+    {
+        @for (int i = 0; i < 3; i++)
+        {
+            <div class="prop-card" style="margin-bottom:16px;">
+                <div style="padding:20px 24px;display:flex;gap:16px;align-items:center;">
+                    <div class="skel" style="width:48px;height:48px;border-radius:12px;flex-shrink:0;"></div>
+                    <div style="flex:1;">
+                        <div class="skel" style="width:180px;height:16px;margin-bottom:8px;"></div>
+                        <div class="skel" style="width:260px;height:12px;"></div>
+                    </div>
                 </div>
-                <div class="modal-body">
-                    @if (!string.IsNullOrEmpty(formError))
-                    {
-                        <div class="alert alert-danger">@formError</div>
-                    }
-                    <div class="row g-3">
-                        <div class="col-12">
-                            <label class="form-label fw-semibold">Property Name *</label>
-                            <input class="form-control" @bind="editingProperty.Name" placeholder="e.g. Riverside Apartments" />
+            </div>
+        }
+    }
+    else if (!filteredProps.Any())
+    {
+        <div class="empty-state">
+            <div class="eico">🏙️</div>
+            <h3>No properties found</h3>
+            <p>@(string.IsNullOrEmpty(searchQ) ? "Add your first property to get started." : "Try adjusting your search or filters.")</p>
+        </div>
+    }
+    else
+    {
+        @foreach (var prop in filteredProps)
+        {
+            var pid        = prop.Id;
+            var actUnits   = prop.Units.Where(u => u.IsActive).ToList();
+            var occ        = actUnits.Count(u => u.IsOccupied);
+            var tot        = actUnits.Count;
+            var pct        = tot > 0 ? (int)Math.Round(occ * 100.0 / tot) : 0;
+            var rev        = actUnits.Where(u => u.IsOccupied).Sum(u => u.MonthlyRent);
+            var expanded   = expandedProps.Contains(pid);
+            var uf         = unitFilters.GetValueOrDefault(pid, "all");
+            var vis        = FilterUnits(actUnits, uf);
+
+            var ufAll = "uft-btn" + (uf == "all"      ? " active" : "");
+            var ufOcc = "uft-btn" + (uf == "occupied" ? " active" : "");
+            var ufVac = "uft-btn" + (uf == "vacant"   ? " active" : "");
+
+            <div class="prop-card @(!prop.IsActive ? "inactive" : "")">
+                <div class="prop-hdr" @onclick="() => ToggleExpand(pid)">
+                    <div class="prop-avatar">🏢</div>
+                    <div class="prop-info">
+                        <div class="prop-name">@prop.Name</div>
+                        <div class="prop-addr">
+                            @prop.Address@(!string.IsNullOrEmpty(prop.City) ? ", " + prop.City : "")@(!string.IsNullOrEmpty(prop.State) ? ", " + prop.State : "")@(!string.IsNullOrEmpty(prop.ZipCode) ? " " + prop.ZipCode : "")
                         </div>
-                        <div class="col-12">
-                            <label class="form-label fw-semibold">Address *</label>
-                            <input class="form-control" @bind="editingProperty.Address" placeholder="Street address" />
+                    </div>
+
+                    <div class="prop-meta">
+                        <div class="prop-chip">
+                            <span class="pc-val">@tot</span>
+                            <span class="pc-lbl">Units</span>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">City</label>
-                            <input class="form-control" @bind="editingProperty.City" />
+                        <div class="prop-chip">
+                            <span class="pc-val" style="color:var(--ap-green)">@occ</span>
+                            <span class="pc-lbl">Occupied</span>
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-semibold">State/County</label>
-                            <input class="form-control" @bind="editingProperty.State" />
+                        <div class="prop-chip">
+                            <span class="pc-val" style="color:var(--ap-blue)">€@rev.ToString("N0")</span>
+                            <span class="pc-lbl">/ Month</span>
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-semibold">Eircode / Postcode</label>
-                            <input class="form-control" @bind="editingProperty.ZipCode" />
+                        <div class="occ-wrap">
+                            <span class="occ-pct">@pct%</span>
+                            <div class="occ-track">
+                                <div class="occ-fill" style="width:@(pct)%"></div>
+                            </div>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Contact Phone</label>
-                            <input class="form-control" @bind="editingProperty.ContactPhone" />
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Contact Email</label>
-                            <input class="form-control" type="email" @bind="editingProperty.ContactEmail" />
+                    </div>
+
+                    <div class="prop-actions" @onclick:stopPropagation="true">
+                        <button class="icon-btn primary" title="Edit property" @onclick="() => OpenPropertyForm(prop)">
+                            <svg width="13" height="13" fill="none" viewBox="0 0 13 13"><path d="M9.5 1.5l2 2-7 7H2.5v-2l7-7z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+                        </button>
+                        @if (prop.IsActive)
+                        {
+                            <button class="icon-btn danger" title="Deactivate" @onclick="() => ConfirmDeactivate(prop)">
+                                <svg width="13" height="13" fill="none" viewBox="0 0 13 13"><circle cx="6.5" cy="6.5" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M4.5 4.5l4 4M8.5 4.5l-4 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+                            </button>
+                        }
+                        <div class="chevron @(expanded ? "open" : "")">
+                            <svg width="13" height="13" fill="none" viewBox="0 0 13 13"><path d="M4.5 2l5 4.5-5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button class="btn btn-secondary" @onclick="() => showPropertyForm = false">Cancel</button>
-                    <button class="btn btn-primary" @onclick="SaveProperty">Save Property</button>
+
+                @if (expanded)
+                {
+                    <div class="units-sec">
+                        <div class="units-bar">
+                            <span class="units-ttl">Units (@tot)</span>
+                            @{
+                                var cbAll = EventCallback.Factory.Create(this, () => SetUnitFilter(pid, "all"));
+                                var cbOcc = EventCallback.Factory.Create(this, () => SetUnitFilter(pid, "occupied"));
+                                var cbVac = EventCallback.Factory.Create(this, () => SetUnitFilter(pid, "vacant"));
+                            }
+                            <div class="units-flt">
+                                <button class="@ufAll" @onclick="cbAll">All</button>
+                                <button class="@ufOcc" @onclick="cbOcc">Occupied</button>
+                                <button class="@ufVac" @onclick="cbVac">Vacant</button>
+                            </div>
+                        </div>
+
+                        @if (!vis.Any())
+                        {
+                            <div class="empty-u">No units match this filter.</div>
+                        }
+                        else
+                        {
+                            <div class="units-grid">
+                                @foreach (var unit in vis.OrderBy(u => u.UnitNumber))
+                                {
+                                    var tags = (unit.Amenities ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Take(4).ToList();
+                                    <div class="unit-card">
+                                        <div class="unit-num">Unit @unit.UnitNumber</div>
+                                        <div class="unit-type">@(string.IsNullOrEmpty(unit.Type) ? "—" : unit.Type)</div>
+                                        <div class="unit-dtls">
+                                            @if (unit.Bedrooms > 0) { <span>🛏 @unit.Bedrooms</span> }
+                                            @if (unit.Bathrooms > 0) { <span>🚿 @unit.Bathrooms</span> }
+                                            @if (unit.FloorArea > 0) { <span>📐 @unit.FloorArea m²</span> }
+                                        </div>
+                                        <div class="unit-rent">€@unit.MonthlyRent.ToString("N2") <span>/ month</span></div>
+                                        @if (tags.Any())
+                                        {
+                                            <div class="unit-tags">
+                                                @foreach (var tag in tags) { <span class="utag">@tag</span> }
+                                            </div>
+                                        }
+                                        <div class="unit-ftr">
+                                            <span class="sdot @(unit.IsOccupied ? "occ" : "vac")">
+                                                @(unit.IsOccupied ? "Occupied" : "Vacant")
+                                            </span>
+                                            <button class="btn-eu" @onclick="() => EditUnit(unit)">Edit</button>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+
+                        <button class="btn-au" @onclick="() => AddUnit(pid)">
+                            <svg width="14" height="14" fill="none" viewBox="0 0 14 14"><path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                            Add Unit
+                        </button>
+                    </div>
+                }
+            </div>
+        }
+    }
+
+</div>
+
+<!-- Property Modal -->
+@if (showPropForm)
+{
+    <div class="mbk" @onclick="() => { showPropForm = false; }"></div>
+    <div class="msh">
+        <div class="mbox" @onclick:stopPropagation="true">
+            <div class="mtop">
+                <h2>@(editProp.Id == 0 ? "New Property" : "Edit Property")</h2>
+                <button class="mcls" @onclick="() => { showPropForm = false; }">✕</button>
+            </div>
+            <div class="mbdy">
+                @if (!string.IsNullOrEmpty(propErr)) { <div class="ferr">@propErr</div> }
+                <div style="display:flex;flex-direction:column;gap:14px;">
+                    <div class="frow">
+                        <div class="fg">
+                            <label class="fl">Property Name *</label>
+                            <input class="fi" @bind="editProp.Name" placeholder="e.g. Riverside Apartments" />
+                        </div>
+                    </div>
+                    <div class="frow">
+                        <div class="fg">
+                            <label class="fl">Street Address *</label>
+                            <input class="fi" @bind="editProp.Address" placeholder="123 Main Street" />
+                        </div>
+                    </div>
+                    <div class="frow c3">
+                        <div class="fg">
+                            <label class="fl">City</label>
+                            <input class="fi" @bind="editProp.City" placeholder="Dublin" />
+                        </div>
+                        <div class="fg">
+                            <label class="fl">County / State</label>
+                            <input class="fi" @bind="editProp.State" placeholder="Co. Dublin" />
+                        </div>
+                        <div class="fg">
+                            <label class="fl">Eircode</label>
+                            <input class="fi" @bind="editProp.ZipCode" placeholder="D01 AB12" />
+                        </div>
+                    </div>
+                    <div class="frow c2">
+                        <div class="fg">
+                            <label class="fl">Contact Phone</label>
+                            <input class="fi" @bind="editProp.ContactPhone" placeholder="+353 1 234 5678" />
+                        </div>
+                        <div class="fg">
+                            <label class="fl">Contact Email</label>
+                            <input class="fi" type="email" @bind="editProp.ContactEmail" placeholder="manager@example.com" />
+                        </div>
+                    </div>
                 </div>
+            </div>
+            <div class="mftr">
+                <button class="btn-cancel" @onclick="() => { showPropForm = false; }">Cancel</button>
+                <button class="btn-save" @onclick="SaveProperty">@(editProp.Id == 0 ? "Create Property" : "Save Changes")</button>
             </div>
         </div>
     </div>
@@ -138,60 +564,84 @@ else
 <!-- Unit Modal -->
 @if (showUnitForm)
 {
-    <div class="modal-backdrop show"></div>
-    <div class="modal d-block">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">@(editingUnit.Id == 0 ? "Add Unit" : "Edit Unit")</h5>
-                    <button type="button" class="btn-close" @onclick="() => showUnitForm = false"></button>
-                </div>
-                <div class="modal-body">
-                    @if (!string.IsNullOrEmpty(unitFormError))
-                    {
-                        <div class="alert alert-danger">@unitFormError</div>
-                    }
-                    <div class="row g-3">
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">Unit Number *</label>
-                            <input class="form-control" @bind="editingUnit.UnitNumber" placeholder="e.g. 101" />
+    <div class="mbk" @onclick="() => { showUnitForm = false; }"></div>
+    <div class="msh">
+        <div class="mbox" @onclick:stopPropagation="true">
+            <div class="mtop">
+                <h2>@(editUnit.Id == 0 ? "New Unit" : "Edit Unit")</h2>
+                <button class="mcls" @onclick="() => { showUnitForm = false; }">✕</button>
+            </div>
+            <div class="mbdy">
+                @if (!string.IsNullOrEmpty(unitErr)) { <div class="ferr">@unitErr</div> }
+                <div style="display:flex;flex-direction:column;gap:14px;">
+                    <div class="frow c2">
+                        <div class="fg">
+                            <label class="fl">Unit Number *</label>
+                            <input class="fi" @bind="editUnit.UnitNumber" placeholder="e.g. 101" />
                         </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">Type</label>
-                            <input class="form-control" @bind="editingUnit.Type" placeholder="Apartment / Studio" />
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">Floor Area (m²)</label>
-                            <input class="form-control" type="number" @bind="editingUnit.FloorArea" />
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">Bedrooms</label>
-                            <input class="form-control" type="number" @bind="editingUnit.Bedrooms" min="0" />
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">Bathrooms</label>
-                            <input class="form-control" type="number" @bind="editingUnit.Bathrooms" min="1" />
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">Monthly Rent (&#8364;) *</label>
-                            <input class="form-control" type="number" @bind="editingUnit.MonthlyRent" step="0.01" />
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label fw-semibold">Amenities</label>
-                            <input class="form-control" @bind="editingUnit.Amenities" placeholder="Parking, Balcony, etc." />
-                        </div>
-                        <div class="col-12">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" @bind="editingUnit.IsOccupied" id="unitOccupied" />
-                                <label class="form-check-label" for="unitOccupied">Currently Occupied</label>
-                            </div>
+                        <div class="fg">
+                            <label class="fl">Type</label>
+                            <input class="fi" @bind="editUnit.Type" placeholder="Apartment / Studio" />
                         </div>
                     </div>
+                    <div class="frow c4">
+                        <div class="fg">
+                            <label class="fl">Beds</label>
+                            <input class="fi" type="number" @bind="editUnit.Bedrooms" min="0" />
+                        </div>
+                        <div class="fg">
+                            <label class="fl">Baths</label>
+                            <input class="fi" type="number" @bind="editUnit.Bathrooms" min="1" />
+                        </div>
+                        <div class="fg">
+                            <label class="fl">Area (m²)</label>
+                            <input class="fi" type="number" @bind="editUnit.FloorArea" />
+                        </div>
+                        <div class="fg">
+                            <label class="fl">Rent (€) *</label>
+                            <input class="fi" type="number" @bind="editUnit.MonthlyRent" step="0.01" />
+                        </div>
+                    </div>
+                    <div class="fg">
+                        <label class="fl">Amenities</label>
+                        <input class="fi" @bind="editUnit.Amenities" placeholder="Parking, Balcony, Gym, Pet Friendly…" />
+                    </div>
+                    <div class="tog-row">
+                        <div>
+                            <div class="tog-lbl">Occupancy Status</div>
+                            <div class="tog-sub">Automatically updated when a lease is assigned to this unit</div>
+                        </div>
+                        <span class="sdot @(editUnit.IsOccupied ? "occ" : "vac")" style="font-size:13px;">
+                            @(editUnit.IsOccupied ? "Occupied" : "Vacant")
+                        </span>
+                    </div>
                 </div>
-                <div class="modal-footer">
-                    <button class="btn btn-secondary" @onclick="() => showUnitForm = false">Cancel</button>
-                    <button class="btn btn-primary" @onclick="SaveUnit">Save Unit</button>
+            </div>
+            <div class="mftr">
+                <button class="btn-cancel" @onclick="() => { showUnitForm = false; }">Cancel</button>
+                <button class="btn-save" @onclick="SaveUnit">@(editUnit.Id == 0 ? "Add Unit" : "Save Changes")</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Confirm Deactivate -->
+@if (showConfirm && confirmTarget != null)
+{
+    <div class="mbk" @onclick="() => { showConfirm = false; }"></div>
+    <div class="msh">
+        <div class="mbox sm" @onclick:stopPropagation="true">
+            <div class="mbdy" style="padding-top:28px;padding-bottom:8px;">
+                <div class="conf-ico">⚠️</div>
+                <div class="conf-ttl">Deactivate Property?</div>
+                <div class="conf-msg">
+                    <strong>@confirmTarget.Name</strong> will be marked inactive.<br/>
+                    Existing units and leases remain unchanged.
                 </div>
+            </div>
+            <div class="mftr center">
+                <button class="btn-cancel" @onclick="() => { showConfirm = false; }">Cancel</button>
+                <button class="btn-danger" @onclick="DoDeactivate">Deactivate</button>
             </div>
         </div>
     </div>
@@ -200,86 +650,186 @@ else
 @code {
     bool loading = true;
     List<Property> properties = new();
-    string successMsg = string.Empty, formError = string.Empty, unitFormError = string.Empty;
+    List<Property> filteredProps = new();
 
-    bool showPropertyForm, showUnitForm;
-    Property editingProperty = new();
-    Unit editingUnit = new();
+    string searchQ = string.Empty;
+    string statusFilter = "all";
+    string sortBy = "name";
+
+    HashSet<int> expandedProps = new();
+    Dictionary<int, string> unitFilters = new();
+
+    string toastMsg = string.Empty, toastClass = string.Empty;
+
+    bool showPropForm, showUnitForm, showConfirm;
+    Property editProp = new();
+    Unit editUnit = new();
+    Property? confirmTarget;
+    string propErr = string.Empty, unitErr = string.Empty;
+
+    // Computed
+    List<Unit> AllUnits      => properties.Where(p => p.IsActive).SelectMany(p => p.Units.Where(u => u.IsActive)).ToList();
+    int  ActivePropCount     => properties.Count(p => p.IsActive);
+    int  OccupiedCount       => AllUnits.Count(u => u.IsOccupied);
+    int  VacantCount         => AllUnits.Count(u => !u.IsOccupied);
+    int  OccRate             => AllUnits.Count > 0 ? (int)Math.Round(OccupiedCount * 100.0 / AllUnits.Count) : 0;
+    decimal TotalRev         => AllUnits.Where(u => u.IsOccupied).Sum(u => u.MonthlyRent);
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadData();
+        properties = await PropertyService.GetAllAsync();
+        ApplyFilters();
         loading = false;
+        if (filteredProps.Any()) expandedProps.Add(filteredProps[0].Id);
     }
 
-    async Task LoadData() => properties = await PropertyService.GetAllAsync();
-
-    void OpenPropertyForm(Property? prop = null)
+    // Search / filter / sort
+    void OnSearch(ChangeEventArgs e)
     {
-        editingProperty = prop != null
-            ? new Property { Id = prop.Id, Name = prop.Name, Address = prop.Address, City = prop.City, State = prop.State, ZipCode = prop.ZipCode, ContactPhone = prop.ContactPhone, ContactEmail = prop.ContactEmail, IsActive = prop.IsActive }
+        searchQ = e.Value?.ToString() ?? string.Empty;
+        ApplyFilters();
+    }
+
+    void OnSortChange(ChangeEventArgs e)
+    {
+        sortBy = e.Value?.ToString() ?? "name";
+        ApplyFilters();
+    }
+
+    void FilterAll()      { statusFilter = "all";      ApplyFilters(); }
+    void FilterActive()   { statusFilter = "active";   ApplyFilters(); }
+    void FilterInactive() { statusFilter = "inactive"; ApplyFilters(); }
+
+    void ApplyFilters()
+    {
+        var q = searchQ.Trim();
+        IEnumerable<Property> r = properties;
+
+        if (statusFilter == "active")   r = r.Where(p => p.IsActive);
+        if (statusFilter == "inactive") r = r.Where(p => !p.IsActive);
+
+        if (!string.IsNullOrEmpty(q))
+            r = r.Where(p =>
+                p.Name.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                p.City.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                p.Address.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                p.Units.Any(u => u.UnitNumber.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                                 u.Type.Contains(q, StringComparison.OrdinalIgnoreCase)));
+
+        filteredProps = (sortBy switch
+        {
+            "city"  => r.OrderBy(p => p.City).ThenBy(p => p.Name),
+            "units" => r.OrderByDescending(p => p.Units.Count(u => u.IsActive)),
+            "occ"   => r.OrderByDescending(p => p.Units.Count(u => u.IsActive && u.IsOccupied)),
+            "rev"   => r.OrderByDescending(p => p.Units.Where(u => u.IsActive && u.IsOccupied).Sum(u => u.MonthlyRent)),
+            _       => r.OrderBy(p => p.Name),
+        }).ToList();
+    }
+
+    List<Unit> FilterUnits(List<Unit> units, string f) => f switch
+    {
+        "occupied" => units.Where(u =>  u.IsOccupied).ToList(),
+        "vacant"   => units.Where(u => !u.IsOccupied).ToList(),
+        _          => units,
+    };
+
+    // Expand / collapse
+    void ToggleExpand(int id) { if (!expandedProps.Remove(id)) expandedProps.Add(id); }
+    void ExpandAll()   { foreach (var p in filteredProps) expandedProps.Add(p.Id); }
+    void CollapseAll() { expandedProps.Clear(); }
+
+    void SetUnitFilter(int propId, string f) => unitFilters[propId] = f;
+
+    // Toast
+    async Task ShowToast(string msg, bool ok = true)
+    {
+        toastMsg = msg; toastClass = ok ? "ok" : "err";
+        StateHasChanged();
+        await Task.Delay(3200);
+        toastMsg = string.Empty;
+        StateHasChanged();
+    }
+
+    // Property CRUD
+    void OpenPropertyForm(Property? p = null)
+    {
+        editProp = p != null
+            ? new Property { Id = p.Id, Name = p.Name, Address = p.Address, City = p.City, State = p.State, ZipCode = p.ZipCode, ContactPhone = p.ContactPhone, ContactEmail = p.ContactEmail, IsActive = p.IsActive }
             : new Property();
-        formError = string.Empty;
-        showPropertyForm = true;
+        propErr = string.Empty;
+        showPropForm = true;
     }
 
     async Task SaveProperty()
     {
-        if (string.IsNullOrWhiteSpace(editingProperty.Name) || string.IsNullOrWhiteSpace(editingProperty.Address))
+        if (string.IsNullOrWhiteSpace(editProp.Name) || string.IsNullOrWhiteSpace(editProp.Address))
         {
-            formError = "Name and address are required.";
+            propErr = "Property name and address are required.";
             return;
         }
-        if (editingProperty.Id == 0)
-            await PropertyService.CreateAsync(editingProperty);
-        else
-            await PropertyService.UpdateAsync(editingProperty);
+        bool isNew = editProp.Id == 0;
+        if (isNew) await PropertyService.CreateAsync(editProp);
+        else       await PropertyService.UpdateAsync(editProp);
 
-        showPropertyForm = false;
-        successMsg = "Property saved successfully.";
-        await LoadData();
+        showPropForm = false;
+        properties = await PropertyService.GetAllAsync();
+        ApplyFilters();
+        if (isNew)
+        {
+            var created = filteredProps.FirstOrDefault(p => p.Name == editProp.Name);
+            if (created != null) expandedProps.Add(created.Id);
+        }
+        await ShowToast(isNew ? "Property created." : "Property updated.");
     }
 
-    async Task DeactivateProperty(int id)
+    void ConfirmDeactivate(Property p) { confirmTarget = p; showConfirm = true; }
+
+    async Task DoDeactivate()
     {
-        await PropertyService.DeactivateAsync(id);
-        successMsg = "Property deactivated.";
-        await LoadData();
+        if (confirmTarget == null) return;
+        await PropertyService.DeactivateAsync(confirmTarget.Id);
+        var name = confirmTarget.Name;
+        showConfirm = false; confirmTarget = null;
+        properties = await PropertyService.GetAllAsync();
+        ApplyFilters();
+        await ShowToast($"\"{name}\" deactivated.");
     }
 
+    // Unit CRUD
     void AddUnit(int propertyId)
     {
-        editingUnit = new Unit { PropertyId = propertyId };
-        unitFormError = string.Empty;
+        editUnit = new Unit { PropertyId = propertyId };
+        unitErr = string.Empty;
         showUnitForm = true;
     }
 
     void EditUnit(Unit u)
     {
-        editingUnit = new Unit
+        editUnit = new Unit
         {
             Id = u.Id, PropertyId = u.PropertyId, UnitNumber = u.UnitNumber, Type = u.Type,
             FloorArea = u.FloorArea, Bedrooms = u.Bedrooms, Bathrooms = u.Bathrooms,
             MonthlyRent = u.MonthlyRent, Amenities = u.Amenities, IsOccupied = u.IsOccupied, IsActive = u.IsActive
         };
-        unitFormError = string.Empty;
+        unitErr = string.Empty;
         showUnitForm = true;
     }
 
     async Task SaveUnit()
     {
-        if (string.IsNullOrWhiteSpace(editingUnit.UnitNumber) || editingUnit.MonthlyRent <= 0)
+        if (string.IsNullOrWhiteSpace(editUnit.UnitNumber) || editUnit.MonthlyRent <= 0)
         {
-            unitFormError = "Unit number and a positive monthly rent are required.";
+            unitErr = "Unit number and a positive monthly rent are required.";
             return;
         }
-        if (editingUnit.Id == 0)
-            await UnitService.CreateAsync(editingUnit);
-        else
-            await UnitService.UpdateAsync(editingUnit);
+        bool isNew = editUnit.Id == 0;
+        if (isNew) await UnitService.CreateAsync(editUnit);
+        else       await UnitService.UpdateAsync(editUnit);
 
         showUnitForm = false;
-        successMsg = "Unit saved successfully.";
-        await LoadData();
+        properties = await PropertyService.GetAllAsync();
+        ApplyFilters();
+        expandedProps.Add(editUnit.PropertyId);
+        await ShowToast(isNew ? "Unit added." : "Unit updated.");
     }
 }

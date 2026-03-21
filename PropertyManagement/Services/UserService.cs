@@ -29,4 +29,45 @@ public class UserService : IUserService
             await _db.SaveChangesAsync();
         }
     }
+
+    public async Task<List<User>> GetAllAsync() =>
+        await _db.Users.OrderBy(u => u.LastName).ToListAsync();
+
+    public async Task<bool> EmailExistsAsync(string email, int? excludeId = null) =>
+        await _db.Users.AnyAsync(u => u.Email == email && (excludeId == null || u.Id != excludeId));
+
+    public async Task CreateAsync(User user, string password)
+    {
+        user.PasswordHash = _hasher.HashPassword(user, password);
+        user.CreatedAt = DateTime.UtcNow;
+        _db.Users.Add(user);
+        await _db.SaveChangesAsync();
+    }
+
+    public async Task UpdateAsync(User user, string? newPassword = null)
+    {
+        var existing = await _db.Users.FindAsync(user.Id);
+        if (existing == null) return;
+
+        existing.FirstName = user.FirstName;
+        existing.LastName = user.LastName;
+        existing.Email = user.Email;
+        existing.Role = user.Role;
+        existing.IsActive = user.IsActive;
+
+        if (!string.IsNullOrWhiteSpace(newPassword))
+            existing.PasswordHash = _hasher.HashPassword(existing, newPassword);
+
+        await _db.SaveChangesAsync();
+    }
+
+    public async Task DeactivateAsync(int userId)
+    {
+        var user = await _db.Users.FindAsync(userId);
+        if (user != null)
+        {
+            user.IsActive = false;
+            await _db.SaveChangesAsync();
+        }
+    }
 }

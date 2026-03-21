@@ -14,10 +14,10 @@ public static class DbInitializer
         var hasher = new PasswordHasher<User>();
         var users = new[]
         {
-            new User { FullName = "Admin User",        Email = "admin@property.com",       Role = UserRole.Admin },
-            new User { FullName = "Property Manager",  Email = "manager@property.com",     Role = UserRole.Manager },
-            new User { FullName = "Maintenance Staff", Email = "maintenance@property.com", Role = UserRole.Staff },
-            new User { FullName = "Accounting Staff",  Email = "accounting@property.com",  Role = UserRole.Staff },
+            new User { FirstName = "Admin",       LastName = "User",    Email = "admin@property.com",       Role = UserRole.Administrator },
+            new User { FirstName = "Property",    LastName = "Manager", Email = "manager@property.com",     Role = UserRole.PropertyManager },
+            new User { FirstName = "Maintenance", LastName = "Staff",   Email = "maintenance@property.com", Role = UserRole.MaintenanceStaff },
+            new User { FirstName = "Accounting",  LastName = "Staff",   Email = "accounting@property.com",  Role = UserRole.AccountingTeam },
         };
         string[] passwords = { "Admin123!", "Manager123!", "Maint123!", "Acct123!" };
 

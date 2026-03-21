@@ -110,8 +110,8 @@
 
 @code {
     bool loading = true, showForm;
-    List<ApplicationUser> users = new();
-    ApplicationUser editing = new();
+    List<User> users = new();
+    User editing = new();
     string password = string.Empty;
     string successMsg = string.Empty, formError = string.Empty;
 
@@ -123,15 +123,15 @@
 
     void OpenCreateForm()
     {
-        editing = new ApplicationUser { IsActive = true };
+        editing = new User { IsActive = true };
         password = string.Empty;
         formError = string.Empty;
         showForm = true;
     }
 
-    void OpenEditForm(ApplicationUser u)
+    void OpenEditForm(User u)
     {
-        editing = new ApplicationUser
+        editing = new User
         {
             Id = u.Id, FirstName = u.FirstName, LastName = u.LastName,
             Email = u.Email, Role = u.Role, IsActive = u.IsActive, PasswordHash = u.PasswordHash

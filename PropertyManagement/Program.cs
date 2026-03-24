@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using PropertyManagement.Auth;
 using PropertyManagement.Components;
@@ -19,6 +20,16 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.AccessDeniedPath = "/Account/Login";
         options.ExpireTimeSpan = TimeSpan.FromHours(8);
         options.SlidingExpiration = true;
+    })
+    .AddCookie("ExternalCookie", options =>
+    {
+        options.ExpireTimeSpan = TimeSpan.FromMinutes(10);
+    })
+    .AddGoogle(options =>
+    {
+        options.SignInScheme = "ExternalCookie";
+        options.ClientId = builder.Configuration["Authentication:Google:ClientId"]!;
+        options.ClientSecret = builder.Configuration["Authentication:Google:ClientSecret"]!;
     });
 
 builder.Services.AddAuthorization();
@@ -45,6 +56,28 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
+var codespaceName = Environment.GetEnvironmentVariable("CODESPACE_NAME");
+var portForwardingDomain = Environment.GetEnvironmentVariable("GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN") ?? "app.github.dev";
+
+if (!string.IsNullOrEmpty(codespaceName))
+{
+    app.Use(async (context, next) =>
+    {
+        context.Request.Scheme = "https";
+        context.Request.Host = new HostString($"{codespaceName}-5163.{portForwardingDomain}");
+        await next(context);
+    });
+}
+else
+{
+    var forwardedOptions = new ForwardedHeadersOptions
+    {
+        ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+    };
+    forwardedOptions.KnownIPNetworks.Clear();
+    forwardedOptions.KnownProxies.Clear();
+    app.UseForwardedHeaders(forwardedOptions);
+}
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();

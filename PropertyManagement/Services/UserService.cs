@@ -12,6 +12,9 @@ public class UserService : IUserService
 
     public UserService(ApplicationDbContext db) => _db = db;
 
+    public async Task<User?> GetByEmailAsync(string email) =>
+        await _db.Users.FirstOrDefaultAsync(u => u.Email == email && u.IsActive);
+
     public async Task<User?> ValidateCredentialsAsync(string email, string password)
     {
         var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == email && u.IsActive);

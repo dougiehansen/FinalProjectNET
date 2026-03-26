@@ -30,6 +30,14 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.SignInScheme = "ExternalCookie";
         options.ClientId = builder.Configuration["Authentication:Google:ClientId"]!;
         options.ClientSecret = builder.Configuration["Authentication:Google:ClientSecret"]!;
+    })
+    .AddMicrosoftAccount(options =>
+    {
+        options.SignInScheme = "ExternalCookie";
+        options.ClientId = builder.Configuration["Authentication:Microsoft:ClientId"]!;
+        options.ClientSecret = builder.Configuration["Authentication:Microsoft:ClientSecret"]!;
+        options.AuthorizationEndpoint = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize";
+        options.TokenEndpoint = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
     });
 
 builder.Services.AddAuthorization();

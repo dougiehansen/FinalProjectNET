@@ -15,7 +15,7 @@ public class Unit
     [MaxLength(100)]
     public string Type { get; set; } = string.Empty;
 
-    public double FloorArea { get; set; }
+    public decimal FloorArea { get; set; }
 
     public int Bedrooms { get; set; }
 

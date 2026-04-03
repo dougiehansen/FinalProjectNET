@@ -13,10 +13,10 @@ public class MaintenanceRequest
     public Unit Unit { get; set; } = null!;
 
     public int SubmittedByUserId { get; set; }
-    public ApplicationUser SubmittedBy { get; set; } = null!;
+    public User SubmittedBy { get; set; } = null!;
 
     public int? AssignedToUserId { get; set; }
-    public ApplicationUser? AssignedTo { get; set; }
+    public User? AssignedTo { get; set; }
 
     [Required, MaxLength(300)]
     public string Title { get; set; } = string.Empty;

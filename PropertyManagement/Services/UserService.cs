@@ -73,4 +73,14 @@ public class UserService : IUserService
             await _db.SaveChangesAsync();
         }
     }
+
+    public async Task ActivateAsync(int userId)
+    {
+        var user = await _db.Users.FindAsync(userId);
+        if (user != null)
+        {
+            user.IsActive = true;
+            await _db.SaveChangesAsync();
+        }
+    }
 }

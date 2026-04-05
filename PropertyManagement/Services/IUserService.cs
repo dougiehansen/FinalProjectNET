@@ -12,4 +12,5 @@ public interface IUserService
     Task CreateAsync(User user, string password);
     Task UpdateAsync(User user, string? newPassword = null);
     Task DeactivateAsync(int userId);
+    Task ActivateAsync(int userId);
 }

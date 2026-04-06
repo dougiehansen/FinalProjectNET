@@ -1,5 +1,179 @@
 @page "/"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject ApplicationDbContext Db
+@inject IJSRuntime JS
+@using Microsoft.EntityFrameworkCore
+@using PropertyManagement.Data
+@using PropertyManagement.Models
+@implements IDisposable
 
-<h2>Welcome to KeyPort</h2>
-<p>You are logged in.</p>
+<PageTitle>Dashboard - PropertyMS</PageTitle>
+
+<style>
+    .dash { max-width: 1200px; margin: 0 auto; padding: 32px 20px 48px; }
+    .dash-title { margin: 0 0 28px; font-size: 2rem; font-weight: 800; letter-spacing: -0.03em; }
+    .dash-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; margin-bottom: 24px; }
+    .dash-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 18px; box-shadow: 0 10px 30px rgba(15,23,42,0.06); }
+    .dash-stat { padding: 20px; }
+    .dash-stat-label { color: #6b7280; font-size: 0.92rem; margin-bottom: 10px; }
+    .dash-stat-value { font-size: 1.9rem; font-weight: 800; letter-spacing: -0.03em; }
+    .dash-stat-sub { margin-top: 8px; color: #6b7280; font-size: 0.88rem; }
+    .dash-map-card { padding: 20px; }
+    .dash-map-card h2 { margin: 0 0 16px; font-size: 1.1rem; font-weight: 700; }
+    #property-map { height: 460px; border-radius: 12px; z-index: 0; }
+    .prop-modal-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,0.4); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .prop-modal { background: #fff; border-radius: 18px; box-shadow: 0 20px 60px rgba(15,23,42,0.2); width: 100%; max-width: 480px; overflow: hidden; }
+    .prop-modal-header { background: #2563eb; padding: 24px; color: white; display: flex; justify-content: space-between; align-items: flex-start; }
+    .prop-modal-header h3 { margin: 0 0 4px; font-size: 1.2rem; font-weight: 700; }
+    .prop-modal-header p { margin: 0; font-size: 0.88rem; opacity: 0.85; }
+    .prop-modal-close { background: rgba(255,255,255,0.2); border: none; color: white; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 1rem; flex-shrink: 0; }
+    .prop-modal-close:hover { background: rgba(255,255,255,0.3); }
+    .prop-modal-body { padding: 24px; }
+    .prop-modal-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f3f4f6; font-size: 0.92rem; }
+    .prop-modal-row:last-child { border-bottom: none; }
+    .prop-modal-row span:first-child { color: #6b7280; }
+    .prop-modal-row span:last-child { font-weight: 600; }
+    .prop-badge { display: inline-flex; padding: 4px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 700; background: #dcfce7; color: #16a34a; }
+    @@media (max-width: 900px) { .dash-stats { grid-template-columns: repeat(2, 1fr); } }
+    @@media (max-width: 540px) { .dash-stats { grid-template-columns: 1fr; } }
+</style>
+
+<div class="dash">
+    <h1 class="dash-title">Dashboard</h1>
+
+    <section class="dash-stats">
+        <div class="dash-card dash-stat">
+            <div class="dash-stat-label">Properties</div>
+            <div class="dash-stat-value">@totalProperties</div>
+            <div class="dash-stat-sub">Active properties</div>
+        </div>
+        <div class="dash-card dash-stat">
+            <div class="dash-stat-label">Units</div>
+            <div class="dash-stat-value">@totalUnits</div>
+            <div class="dash-stat-sub">@occupiedUnits occupied</div>
+        </div>
+        <div class="dash-card dash-stat">
+            <div class="dash-stat-label">Active Leases</div>
+            <div class="dash-stat-value">@activeLeases</div>
+            <div class="dash-stat-sub">Current tenants</div>
+        </div>
+        <div class="dash-card dash-stat">
+            <div class="dash-stat-label">Open Maintenance</div>
+            <div class="dash-stat-value">@openMaintenance</div>
+            <div class="dash-stat-sub">Requests pending</div>
+        </div>
+    </section>
+
+    <div class="dash-card dash-map-card">
+        <h2>Property Locations</h2>
+        <div id="property-map"></div>
+    </div>
+</div>
+
+@if (selectedPin is not null)
+{
+    <div class="prop-modal-backdrop" @onclick="CloseModal">
+        <div class="prop-modal" @onclick:stopPropagation>
+            <div class="prop-modal-header">
+                <div>
+                    <h3>@selectedPin.Name</h3>
+                    <p>@selectedPin.Address, @selectedPin.City @selectedPin.ZipCode</p>
+                </div>
+                <button class="prop-modal-close" @onclick="CloseModal">✕</button>
+            </div>
+            <div class="prop-modal-body">
+                <div class="prop-modal-row">
+                    <span>Status</span>
+                    <span><span class="prop-badge">Active</span></span>
+                </div>
+                <div class="prop-modal-row">
+                    <span>Total Units</span>
+                    <span>@selectedPin.UnitCount</span>
+                </div>
+                <div class="prop-modal-row">
+                    <span>Occupied Units</span>
+                    <span>@selectedPin.OccupiedUnits</span>
+                </div>
+                <div class="prop-modal-row">
+                    <span>Vacancy</span>
+                    <span>@(selectedPin.UnitCount - selectedPin.OccupiedUnits) units available</span>
+                </div>
+                <div class="prop-modal-row">
+                    <span>Contact Phone</span>
+                    <span>@selectedPin.ContactPhone</span>
+                </div>
+                <div class="prop-modal-row">
+                    <span>Contact Email</span>
+                    <span>@selectedPin.ContactEmail</span>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    int totalProperties, totalUnits, occupiedUnits, activeLeases, openMaintenance;
+    List<PropertyMapPin> pins = new();
+    PropertyMapPin? selectedPin;
+    DotNetObjectReference<Home>? dotNetRef;
+
+    protected override async Task OnInitializedAsync()
+    {
+        totalProperties = await Db.Properties.CountAsync(p => p.IsActive);
+        totalUnits      = await Db.Units.CountAsync(u => u.IsActive);
+        occupiedUnits   = await Db.Units.CountAsync(u => u.IsActive && u.IsOccupied);
+        activeLeases    = await Db.Leases.CountAsync(l => l.Status == LeaseStatus.Active);
+        openMaintenance = await Db.MaintenanceRequests.CountAsync(m => m.Status == MaintenanceStatus.Open || m.Status == MaintenanceStatus.InProgress);
+
+        pins = await Db.Properties
+            .Where(p => p.IsActive && p.Latitude != 0)
+            .Select(p => new PropertyMapPin
+            {
+                Name          = p.Name,
+                Address       = p.Address,
+                City          = p.City,
+                ZipCode       = p.ZipCode,
+                ContactPhone  = p.ContactPhone,
+                ContactEmail  = p.ContactEmail,
+                Latitude      = p.Latitude,
+                Longitude     = p.Longitude,
+                UnitCount     = p.Units.Count(u => u.IsActive),
+                OccupiedUnits = p.Units.Count(u => u.IsActive && u.IsOccupied)
+            })
+            .ToListAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && pins.Count > 0)
+        {
+            dotNetRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("leafletMap.init", "property-map", pins, dotNetRef);
+        }
+    }
+
+    [JSInvokable]
+    public void ShowProperty(string name)
+    {
+        selectedPin = pins.FirstOrDefault(p => p.Name == name);
+        StateHasChanged();
+    }
+
+    void CloseModal() => selectedPin = null;
+
+    public void Dispose() => dotNetRef?.Dispose();
+
+    record PropertyMapPin
+    {
+        public string Name          { get; init; } = string.Empty;
+        public string Address       { get; init; } = string.Empty;
+        public string City          { get; init; } = string.Empty;
+        public string ZipCode       { get; init; } = string.Empty;
+        public string ContactPhone  { get; init; } = string.Empty;
+        public string ContactEmail  { get; init; } = string.Empty;
+        public double Latitude      { get; init; }
+        public double Longitude     { get; init; }
+        public int    UnitCount     { get; init; }
+        public int    OccupiedUnits { get; init; }
+    }
+}

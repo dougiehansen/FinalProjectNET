@@ -40,7 +40,9 @@ public static class DbInitializer
                 State = "Dublin 7",
                 ZipCode = "D07 F8X2",
                 ContactPhone = "01 872 4400",
-                ContactEmail = "liffey@dublinproperties.ie"
+                ContactEmail = "liffey@dublinproperties.ie",
+                Latitude = 53.3461,
+                Longitude = -6.2675
             },
             new Property
             {
@@ -50,7 +52,9 @@ public static class DbInitializer
                 State = "Dublin 4",
                 ZipCode = "D04 K2P1",
                 ContactPhone = "01 660 3100",
-                ContactEmail = "grandcanal@dublinproperties.ie"
+                ContactEmail = "grandcanal@dublinproperties.ie",
+                Latitude = 53.3318,
+                Longitude = -6.2433
             },
             new Property
             {
@@ -60,7 +64,9 @@ public static class DbInitializer
                 State = "Dublin 7",
                 ZipCode = "D07 A3N4",
                 ContactPhone = "01 838 5500",
-                ContactEmail = "stoneybatter@dublinproperties.ie"
+                ContactEmail = "stoneybatter@dublinproperties.ie",
+                Latitude = 53.3489,
+                Longitude = -6.2794
             }
         };
 

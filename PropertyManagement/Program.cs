@@ -49,6 +49,9 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IPropertyService, PropertyService>();
+builder.Services.AddScoped<IUnitService, UnitService>();
+builder.Services.AddScoped<ILeaseService, LeaseService>();
 
 var app = builder.Build();
 

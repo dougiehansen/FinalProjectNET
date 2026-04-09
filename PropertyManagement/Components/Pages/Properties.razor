@@ -1,0 +1,620 @@
+@page "/properties"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Administrator,PropertyManager")]
+@inject IPropertyService PropertyService
+@inject IUnitService UnitService
+@inject ILeaseService LeaseService
+@inject NavigationManager Nav
+
+<PageTitle>Properties - PropertyMS</PageTitle>
+
+<div class="pm">
+
+    <!-- Toasts -->
+    <div class="toast-stack">
+        @if (!string.IsNullOrEmpty(toastMsg))
+        {
+            <div class="toast-item @toastClass">@toastMsg</div>
+        }
+    </div>
+
+    <!-- Page Header -->
+    <div class="pm-hdr">
+        <div>
+            <h1>Properties &amp; Units</h1>
+            <p>@filteredProps.Count @(filteredProps.Count == 1 ? "property" : "properties") &nbsp;·&nbsp; @AllUnits.Count units total</p>
+        </div>
+        <button class="btn-primary-action" @onclick="() => OpenPropertyForm()">
+            <svg width="14" height="14" fill="none" viewBox="0 0 14 14"><path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            Add Property
+        </button>
+    </div>
+
+    <!-- Stats Strip -->
+    <div class="stats-grid g4">
+        <div class="stat-card stat-card-flex">
+            <div class="stat-icon si-blue">🏢</div>
+            <div>
+                <div class="stat-label">Properties</div>
+                <div class="stat-value">@ActivePropCount</div>
+                <div class="stat-sub">@properties.Count(p => !p.IsActive) inactive</div>
+            </div>
+        </div>
+        <div class="stat-card stat-card-flex">
+            <div class="stat-icon si-green">🏠</div>
+            <div>
+                <div class="stat-label">Total Units</div>
+                <div class="stat-value">@AllUnits.Count</div>
+                <div class="stat-sub">@OccupiedCount occupied</div>
+            </div>
+        </div>
+        <div class="stat-card stat-card-flex">
+            <div class="stat-icon si-orange">📊</div>
+            <div>
+                <div class="stat-label">Occupancy</div>
+                <div class="stat-value">@OccRate%</div>
+                <div class="stat-sub">@VacantCount vacant</div>
+            </div>
+        </div>
+        <div class="stat-card stat-card-flex">
+            <div class="stat-icon si-red">💶</div>
+            <div>
+                <div class="stat-label">Monthly Revenue</div>
+                <div class="stat-value">€@TotalRev.ToString("N0")</div>
+                <div class="stat-sub">from occupied units</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toolbar -->
+    @{
+        var sAll  = "seg-btn" + (statusFilter == "all"      ? " active" : "");
+        var sAct  = "seg-btn" + (statusFilter == "active"   ? " active" : "");
+        var sInac = "seg-btn" + (statusFilter == "inactive" ? " active" : "");
+    }
+    <div class="toolbar">
+        <div class="search-wrap">
+            <svg width="15" height="15" fill="none" viewBox="0 0 15 15">
+                <circle cx="6.5" cy="6.5" r="5" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M10.5 10.5l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <input class="search-inp" placeholder="Search properties, cities, units…"
+                   value="@searchQ" @oninput="OnSearch" />
+        </div>
+
+        <div class="seg">
+            <button class="@sAll"  @onclick="FilterAll">All</button>
+            <button class="@sAct"  @onclick="FilterActive">Active</button>
+            <button class="@sInac" @onclick="FilterInactive">Inactive</button>
+        </div>
+
+        <select class="filter-select" value="@sortBy" @onchange="OnSortChange">
+            <option value="name">Sort: Name</option>
+            <option value="city">Sort: City</option>
+            <option value="units">Sort: Units</option>
+            <option value="occ">Sort: Occupancy</option>
+            <option value="rev">Sort: Revenue</option>
+        </select>
+
+        <button class="icon-btn" title="Expand all" @onclick="ExpandAll">
+            <svg width="14" height="14" fill="none" viewBox="0 0 14 14"><path d="M1 4l6 6 6-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="icon-btn" title="Collapse all" @onclick="CollapseAll">
+            <svg width="14" height="14" fill="none" viewBox="0 0 14 14"><path d="M13 10l-6-6-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+    </div>
+
+    <!-- List -->
+    @if (loading)
+    {
+        @for (int i = 0; i < 3; i++)
+        {
+            <div class="prop-card" style="margin-bottom:16px;">
+                <div style="padding:20px 24px;display:flex;gap:16px;align-items:center;">
+                    <div class="skeleton" style="width:48px;height:48px;border-radius:12px;flex-shrink:0;"></div>
+                    <div style="flex:1;">
+                        <div class="skeleton" style="width:180px;height:16px;margin-bottom:8px;"></div>
+                        <div class="skeleton" style="width:260px;height:12px;"></div>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+    else if (!filteredProps.Any())
+    {
+        <div class="empty-state">
+            <div class="empty-icon">🏙️</div>
+            <h3>No properties found</h3>
+            <p>@(string.IsNullOrEmpty(searchQ) ? "Add your first property to get started." : "Try adjusting your search or filters.")</p>
+        </div>
+    }
+    else
+    {
+        @foreach (var prop in filteredProps)
+        {
+            var pid        = prop.Id;
+            var actUnits   = prop.Units.Where(u => u.IsActive).ToList();
+            var occ        = actUnits.Count(u => u.IsOccupied);
+            var tot        = actUnits.Count;
+            var pct        = tot > 0 ? (int)Math.Round(occ * 100.0 / tot) : 0;
+            var rev        = actUnits.Where(u => u.IsOccupied).Sum(u => u.MonthlyRent);
+            var expanded   = expandedProps.Contains(pid);
+            var uf         = unitFilters.GetValueOrDefault(pid, "all");
+            var vis        = FilterUnits(actUnits, uf);
+
+            var ufAll = "uft-btn" + (uf == "all"      ? " active" : "");
+            var ufOcc = "uft-btn" + (uf == "occupied" ? " active" : "");
+            var ufVac = "uft-btn" + (uf == "vacant"   ? " active" : "");
+
+            <div class="prop-card @(!prop.IsActive ? "inactive" : "")">
+                <div class="prop-hdr" @onclick="() => ToggleExpand(pid)">
+                    <div class="prop-avatar">🏢</div>
+                    <div class="prop-info">
+                        <div class="prop-name">@prop.Name</div>
+                        <div class="prop-addr">
+                            @prop.Address@(!string.IsNullOrEmpty(prop.City) ? ", " + prop.City : "")@(!string.IsNullOrEmpty(prop.State) ? ", " + prop.State : "")@(!string.IsNullOrEmpty(prop.ZipCode) ? " " + prop.ZipCode : "")
+                        </div>
+                    </div>
+
+                    <div class="prop-meta">
+                        <div class="prop-chip">
+                            <span class="pc-val">@tot</span>
+                            <span class="pc-lbl">Units</span>
+                        </div>
+                        <div class="prop-chip">
+                            <span class="pc-val" style="color:var(--green)">@occ</span>
+                            <span class="pc-lbl">Occupied</span>
+                        </div>
+                        <div class="prop-chip">
+                            <span class="pc-val" style="color:var(--blue)">€@rev.ToString("N0")</span>
+                            <span class="pc-lbl">/ Month</span>
+                        </div>
+                        <div class="occ-wrap">
+                            <span class="occ-pct">@pct%</span>
+                            <div class="occ-track">
+                                <div class="occ-fill" style="width:@(pct)%"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="prop-actions" @onclick:stopPropagation="true">
+                        <button class="icon-btn primary" title="Edit property" @onclick="() => OpenPropertyForm(prop)">
+                            <svg width="13" height="13" fill="none" viewBox="0 0 13 13"><path d="M9.5 1.5l2 2-7 7H2.5v-2l7-7z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+                        </button>
+                        @if (prop.IsActive)
+                        {
+                            <button class="icon-btn danger" title="Deactivate" @onclick="() => ConfirmDeactivate(prop)">
+                                <svg width="13" height="13" fill="none" viewBox="0 0 13 13"><circle cx="6.5" cy="6.5" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M4.5 4.5l4 4M8.5 4.5l-4 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+                            </button>
+                        }
+                        else
+                        {
+                            <button class="icon-btn reactivate" title="Reactivate" @onclick="() => DoReactivate(prop)">
+                                <svg width="13" height="13" fill="none" viewBox="0 0 13 13"><path d="M2 6.5a4.5 4.5 0 1 1 1.5 3.35M2 10V6.5h3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            </button>
+                        }
+                        <div class="chevron @(expanded ? "open" : "")">
+                            <svg width="13" height="13" fill="none" viewBox="0 0 13 13"><path d="M4.5 2l5 4.5-5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </div>
+                    </div>
+                </div>
+
+                @if (expanded)
+                {
+                    <div class="units-sec">
+                        <div class="units-bar">
+                            <span class="units-ttl">Units (@tot)</span>
+                            @{
+                                var cbAll = EventCallback.Factory.Create(this, () => SetUnitFilter(pid, "all"));
+                                var cbOcc = EventCallback.Factory.Create(this, () => SetUnitFilter(pid, "occupied"));
+                                var cbVac = EventCallback.Factory.Create(this, () => SetUnitFilter(pid, "vacant"));
+                            }
+                            <div class="units-flt">
+                                <button class="@ufAll" @onclick="cbAll">All</button>
+                                <button class="@ufOcc" @onclick="cbOcc">Occupied</button>
+                                <button class="@ufVac" @onclick="cbVac">Vacant</button>
+                            </div>
+                        </div>
+
+                        @if (!vis.Any())
+                        {
+                            <div class="empty-u">No units match this filter.</div>
+                        }
+                        else
+                        {
+                            <div class="units-grid">
+                                @foreach (var unit in vis.OrderBy(u => u.UnitNumber))
+                                {
+                                    var tags        = (unit.Amenities ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Take(4).ToList();
+                                    var activeLease = activeLeasesByUnit.GetValueOrDefault(unit.Id);
+                                    var tenant      = activeLease?.Tenant;
+                                    <div class="unit-card">
+                                        <div class="unit-num">Unit @unit.UnitNumber</div>
+                                        <div class="unit-type">@(string.IsNullOrEmpty(unit.Type) ? "—" : unit.Type)</div>
+                                        <div class="unit-dtls">
+                                            @if (unit.Bedrooms > 0) { <span>🛏 @unit.Bedrooms</span> }
+                                            @if (unit.Bathrooms > 0) { <span>🚿 @unit.Bathrooms</span> }
+                                            @if (unit.FloorArea > 0) { <span>📐 @unit.FloorArea m²</span> }
+                                        </div>
+                                        <div class="unit-rent">€@unit.MonthlyRent.ToString("N2") <span>/ month</span></div>
+                                        @if (tags.Any())
+                                        {
+                                            <div class="unit-tags">
+                                                @foreach (var tag in tags) { <span class="utag">@tag</span> }
+                                            </div>
+                                        }
+                                        @if (tenant != null)
+                                        {
+                                            <a href="/tenants" class="tenant-link">
+                                                <div class="tenant-avatar">@tenant.FirstName[0]@tenant.LastName[0]</div>
+                                                <div class="tenant-info">
+                                                    <span class="tenant-name">@tenant.FullName</span>
+                                                    <span class="tenant-id">#@tenant.Id</span>
+                                                </div>
+                                                <svg width="12" height="12" fill="none" viewBox="0 0 12 12" style="flex-shrink:0;color:#8E8E93"><path d="M4 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                            </a>
+                                        }
+                                        <div class="unit-ftr">
+                                            <span class="status-dot @(unit.IsOccupied ? "occ" : "vac")">
+                                                @(unit.IsOccupied ? "Occupied" : "Vacant")
+                                            </span>
+                                            <button class="btn-eu" @onclick="() => EditUnit(unit)">Edit</button>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+
+                        <button class="btn-au" @onclick="() => AddUnit(pid)">
+                            <svg width="14" height="14" fill="none" viewBox="0 0 14 14"><path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                            Add Unit
+                        </button>
+                    </div>
+                }
+            </div>
+        }
+    }
+
+</div>
+
+<!-- Property Modal -->
+@if (showPropForm)
+{
+    <div class="modal-overlay" @onclick="() => { showPropForm = false; }"></div>
+    <div class="modal-sheet">
+        <div class="modal-box" @onclick:stopPropagation="true">
+            <div class="modal-top">
+                <h2>@(editProp.Id == 0 ? "New Property" : "Edit Property")</h2>
+                <button class="modal-close" @onclick="() => { showPropForm = false; }">✕</button>
+            </div>
+            <div class="modal-body-inner">
+                @if (!string.IsNullOrEmpty(propErr)) { <div class="field-error">@propErr</div> }
+                <div style="display:flex;flex-direction:column;gap:14px;">
+                    <div class="field-row">
+                        <div class="field-group">
+                            <label class="field-label">Property Name *</label>
+                            <input class="field-input" @bind="editProp.Name" placeholder="e.g. Riverside Apartments" />
+                        </div>
+                    </div>
+                    <div class="field-row">
+                        <div class="field-group">
+                            <label class="field-label">Street Address *</label>
+                            <input class="field-input" @bind="editProp.Address" placeholder="123 Main Street" />
+                        </div>
+                    </div>
+                    <div class="field-row c3">
+                        <div class="field-group">
+                            <label class="field-label">City</label>
+                            <input class="field-input" @bind="editProp.City" placeholder="Dublin" />
+                        </div>
+                        <div class="field-group">
+                            <label class="field-label">County / State</label>
+                            <input class="field-input" @bind="editProp.State" placeholder="Co. Dublin" />
+                        </div>
+                        <div class="field-group">
+                            <label class="field-label">Eircode</label>
+                            <input class="field-input" @bind="editProp.ZipCode" placeholder="D01 AB12" />
+                        </div>
+                    </div>
+                    <div class="field-row c2">
+                        <div class="field-group">
+                            <label class="field-label">Contact Phone</label>
+                            <input class="field-input" @bind="editProp.ContactPhone" placeholder="+353 1 234 5678" />
+                        </div>
+                        <div class="field-group">
+                            <label class="field-label">Contact Email</label>
+                            <input class="field-input" type="email" @bind="editProp.ContactEmail" placeholder="manager@example.com" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-foot">
+                <button class="btn-cancel" @onclick="() => { showPropForm = false; }">Cancel</button>
+                <button class="btn-save" @onclick="SaveProperty">@(editProp.Id == 0 ? "Create Property" : "Save Changes")</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Unit Modal -->
+@if (showUnitForm)
+{
+    <div class="modal-overlay" @onclick="() => { showUnitForm = false; }"></div>
+    <div class="modal-sheet">
+        <div class="modal-box" @onclick:stopPropagation="true">
+            <div class="modal-top">
+                <h2>@(editUnit.Id == 0 ? "New Unit" : "Edit Unit")</h2>
+                <button class="modal-close" @onclick="() => { showUnitForm = false; }">✕</button>
+            </div>
+            <div class="modal-body-inner">
+                @if (!string.IsNullOrEmpty(unitErr)) { <div class="field-error">@unitErr</div> }
+                <div style="display:flex;flex-direction:column;gap:14px;">
+                    <div class="field-row c2">
+                        <div class="field-group">
+                            <label class="field-label">Unit Number *</label>
+                            <input class="field-input" @bind="editUnit.UnitNumber" placeholder="e.g. 101" />
+                        </div>
+                        <div class="field-group">
+                            <label class="field-label">Type</label>
+                            <input class="field-input" @bind="editUnit.Type" placeholder="Apartment / Studio" />
+                        </div>
+                    </div>
+                    <div class="field-row c4">
+                        <div class="field-group">
+                            <label class="field-label">Beds</label>
+                            <input class="field-input" type="number" @bind="editUnit.Bedrooms" min="0" />
+                        </div>
+                        <div class="field-group">
+                            <label class="field-label">Baths</label>
+                            <input class="field-input" type="number" @bind="editUnit.Bathrooms" min="1" />
+                        </div>
+                        <div class="field-group">
+                            <label class="field-label">Area (m²)</label>
+                            <input class="field-input" type="number" @bind="editUnit.FloorArea" />
+                        </div>
+                        <div class="field-group">
+                            <label class="field-label">Rent (€) *</label>
+                            <input class="field-input" type="number" @bind="editUnit.MonthlyRent" step="0.01" />
+                        </div>
+                    </div>
+                    <div class="field-group">
+                        <label class="field-label">Amenities</label>
+                        <input class="field-input" @bind="editUnit.Amenities" placeholder="Parking, Balcony, Gym, Pet Friendly…" />
+                    </div>
+                    <div class="toggle-row">
+                        <div>
+                            <div class="toggle-label">Occupancy Status</div>
+                            <div class="toggle-sub">Automatically updated when a lease is assigned to this unit</div>
+                        </div>
+                        <span class="status-dot @(editUnit.IsOccupied ? "occ" : "vac")" style="font-size:13px;">
+                            @(editUnit.IsOccupied ? "Occupied" : "Vacant")
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-foot">
+                <button class="btn-cancel" @onclick="() => { showUnitForm = false; }">Cancel</button>
+                <button class="btn-save" @onclick="SaveUnit">@(editUnit.Id == 0 ? "Add Unit" : "Save Changes")</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Confirm Deactivate -->
+@if (showConfirm && confirmTarget != null)
+{
+    <div class="modal-overlay" @onclick="() => { showConfirm = false; }"></div>
+    <div class="modal-sheet">
+        <div class="modal-box sm" @onclick:stopPropagation="true">
+            <div class="modal-body-inner" style="padding-top:28px;padding-bottom:8px;">
+                <div class="confirm-icon">⚠️</div>
+                <div class="confirm-title">Deactivate Property?</div>
+                <div class="confirm-msg">
+                    <strong>@confirmTarget.Name</strong> will be marked inactive.<br/>
+                    Existing units and leases remain unchanged.
+                </div>
+            </div>
+            <div class="modal-foot center">
+                <button class="btn-cancel" @onclick="() => { showConfirm = false; }">Cancel</button>
+                <button class="btn-danger" @onclick="DoDeactivate">Deactivate</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    bool loading = true;
+    List<Property> properties = new();
+    List<Property> filteredProps = new();
+    Dictionary<int, Lease> activeLeasesByUnit = new();
+
+    string searchQ = string.Empty;
+    string statusFilter = "all";
+    string sortBy = "name";
+
+    HashSet<int> expandedProps = new();
+    Dictionary<int, string> unitFilters = new();
+
+    string toastMsg = string.Empty, toastClass = string.Empty;
+
+    bool showPropForm, showUnitForm, showConfirm;
+    Property editProp = new();
+    Unit editUnit = new();
+    Property? confirmTarget;
+    string propErr = string.Empty, unitErr = string.Empty;
+
+    // Computed
+    List<Unit> AllUnits      => properties.Where(p => p.IsActive).SelectMany(p => p.Units.Where(u => u.IsActive)).ToList();
+    int  ActivePropCount     => properties.Count(p => p.IsActive);
+    int  OccupiedCount       => AllUnits.Count(u => u.IsOccupied);
+    int  VacantCount         => AllUnits.Count(u => !u.IsOccupied);
+    int  OccRate             => AllUnits.Count > 0 ? (int)Math.Round(OccupiedCount * 100.0 / AllUnits.Count) : 0;
+    decimal TotalRev         => AllUnits.Where(u => u.IsOccupied).Sum(u => u.MonthlyRent);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+        loading = false;
+        if (filteredProps.Any()) expandedProps.Add(filteredProps[0].Id);
+    }
+
+    async Task LoadData()
+    {
+        properties = await PropertyService.GetAllAsync();
+        activeLeasesByUnit = await LeaseService.GetActiveLeasesByUnitAsync();
+        ApplyFilters();
+    }
+
+    // Search / filter / sort
+    void OnSearch(ChangeEventArgs e)
+    {
+        searchQ = e.Value?.ToString() ?? string.Empty;
+        ApplyFilters();
+    }
+
+    void OnSortChange(ChangeEventArgs e)
+    {
+        sortBy = e.Value?.ToString() ?? "name";
+        ApplyFilters();
+    }
+
+    void FilterAll()      { statusFilter = "all";      ApplyFilters(); }
+    void FilterActive()   { statusFilter = "active";   ApplyFilters(); }
+    void FilterInactive() { statusFilter = "inactive"; ApplyFilters(); }
+
+    void ApplyFilters()
+    {
+        var q = searchQ.Trim();
+        IEnumerable<Property> r = properties;
+
+        if (statusFilter == "active")   r = r.Where(p => p.IsActive);
+        if (statusFilter == "inactive") r = r.Where(p => !p.IsActive);
+
+        if (!string.IsNullOrEmpty(q))
+            r = r.Where(p =>
+                p.Name.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                p.City.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                p.Address.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                p.Units.Any(u => u.UnitNumber.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                                 u.Type.Contains(q, StringComparison.OrdinalIgnoreCase)));
+
+        filteredProps = (sortBy switch
+        {
+            "city"  => r.OrderBy(p => p.City).ThenBy(p => p.Name),
+            "units" => r.OrderByDescending(p => p.Units.Count(u => u.IsActive)),
+            "occ"   => r.OrderByDescending(p => p.Units.Count(u => u.IsActive && u.IsOccupied)),
+            "rev"   => r.OrderByDescending(p => p.Units.Where(u => u.IsActive && u.IsOccupied).Sum(u => u.MonthlyRent)),
+            _       => r.OrderBy(p => p.Name),
+        }).ToList();
+    }
+
+    List<Unit> FilterUnits(List<Unit> units, string f) => f switch
+    {
+        "occupied" => units.Where(u =>  u.IsOccupied).ToList(),
+        "vacant"   => units.Where(u => !u.IsOccupied).ToList(),
+        _          => units,
+    };
+
+    // Expand / collapse
+    void ToggleExpand(int id) { if (!expandedProps.Remove(id)) expandedProps.Add(id); }
+    void ExpandAll()   { foreach (var p in filteredProps) expandedProps.Add(p.Id); }
+    void CollapseAll() { expandedProps.Clear(); }
+
+    void SetUnitFilter(int propId, string f) => unitFilters[propId] = f;
+
+    // Toast
+    async Task ShowToast(string msg, bool ok = true)
+    {
+        toastMsg = msg; toastClass = ok ? "ok" : "err";
+        StateHasChanged();
+        await Task.Delay(3200);
+        toastMsg = string.Empty;
+        StateHasChanged();
+    }
+
+    // Property CRUD
+    void OpenPropertyForm(Property? p = null)
+    {
+        editProp = p != null
+            ? new Property { Id = p.Id, Name = p.Name, Address = p.Address, City = p.City, State = p.State, ZipCode = p.ZipCode, ContactPhone = p.ContactPhone, ContactEmail = p.ContactEmail, IsActive = p.IsActive }
+            : new Property();
+        propErr = string.Empty;
+        showPropForm = true;
+    }
+
+    async Task SaveProperty()
+    {
+        if (string.IsNullOrWhiteSpace(editProp.Name) || string.IsNullOrWhiteSpace(editProp.Address))
+        {
+            propErr = "Property name and address are required.";
+            return;
+        }
+        bool isNew = editProp.Id == 0;
+        if (isNew) await PropertyService.CreateAsync(editProp);
+        else       await PropertyService.UpdateAsync(editProp);
+
+        showPropForm = false;
+        await LoadData();
+        if (isNew)
+        {
+            var created = filteredProps.FirstOrDefault(p => p.Name == editProp.Name);
+            if (created != null) expandedProps.Add(created.Id);
+        }
+        await ShowToast(isNew ? "Property created." : "Property updated.");
+    }
+
+    void ConfirmDeactivate(Property p) { confirmTarget = p; showConfirm = true; }
+
+    async Task DoReactivate(Property p)
+    {
+        await PropertyService.ReactivateAsync(p.Id);
+        await LoadData();
+        await ShowToast($"\"{p.Name}\" reactivated.");
+    }
+
+    async Task DoDeactivate()
+    {
+        if (confirmTarget == null) return;
+        await PropertyService.DeactivateAsync(confirmTarget.Id);
+        var name = confirmTarget.Name;
+        showConfirm = false; confirmTarget = null;
+        await LoadData();
+        await ShowToast($"\"{name}\" deactivated.");
+    }
+
+    // Unit CRUD
+    void AddUnit(int propertyId)
+    {
+        editUnit = new Unit { PropertyId = propertyId };
+        unitErr = string.Empty;
+        showUnitForm = true;
+    }
+
+    void EditUnit(Unit u)
+    {
+        editUnit = new Unit
+        {
+            Id = u.Id, PropertyId = u.PropertyId, UnitNumber = u.UnitNumber, Type = u.Type,
+            FloorArea = u.FloorArea, Bedrooms = u.Bedrooms, Bathrooms = u.Bathrooms,
+            MonthlyRent = u.MonthlyRent, Amenities = u.Amenities, IsOccupied = u.IsOccupied, IsActive = u.IsActive
+        };
+        unitErr = string.Empty;
+        showUnitForm = true;
+    }
+
+    async Task SaveUnit()
+    {
+        if (string.IsNullOrWhiteSpace(editUnit.UnitNumber) || editUnit.MonthlyRent <= 0)
+        {
+            unitErr = "Unit number and a positive monthly rent are required.";
+            return;
+        }
+        bool isNew = editUnit.Id == 0;
+        if (isNew) await UnitService.CreateAsync(editUnit);
+        else       await UnitService.UpdateAsync(editUnit);
+
+        showUnitForm = false;
+        await LoadData();
+        expandedProps.Add(editUnit.PropertyId);
+        await ShowToast(isNew ? "Unit added." : "Unit updated.");
+    }
+}

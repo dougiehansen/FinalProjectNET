@@ -9,86 +9,88 @@
 
 <PageTitle>Dashboard - PropertyMS</PageTitle>
 
-<style>
-    .dash { max-width: 1200px; margin: 0 auto; padding: 32px 20px 48px; }
-    .dash-title { margin: 0 0 28px; font-size: 2rem; font-weight: 800; letter-spacing: -0.03em; }
-    .dash-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; margin-bottom: 24px; }
-    .dash-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 18px; box-shadow: 0 10px 30px rgba(15,23,42,0.06); }
-    .dash-stat { padding: 20px; }
-    .dash-stat-label { color: #6b7280; font-size: 0.92rem; margin-bottom: 10px; }
-    .dash-stat-value { font-size: 1.9rem; font-weight: 800; letter-spacing: -0.03em; }
-    .dash-stat-sub { margin-top: 8px; color: #6b7280; font-size: 0.88rem; }
-    .dash-map-card { padding: 20px; }
-    .dash-map-card h2 { margin: 0 0 16px; font-size: 1.1rem; font-weight: 700; }
-    #property-map { height: 460px; border-radius: 12px; z-index: 0; }
-    .dash-bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 18px; }
-    .dash-chart-card { padding: 20px; }
-    .dash-chart-card h2 { margin: 0 0 4px; font-size: 1.1rem; font-weight: 700; }
-    .dash-chart-card p { margin: 0 0 12px; color: #6b7280; font-size: 0.88rem; }
-    .chart-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
-    .chart-toolbar label { font-size: 0.82rem; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
-    .chart-filter { padding: 9px 12px; border-radius: 10px; border: 1px solid #e5e7eb; background: white; font-size: 0.9rem; outline: none; min-width: 220px; }
-    .chart-filter:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.08); }
-    @@media (max-width: 900px) { .dash-bottom { grid-template-columns: 1fr; } }
-    .prop-modal-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,0.4); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 20px; }
-    .prop-modal { background: #fff; border-radius: 18px; box-shadow: 0 20px 60px rgba(15,23,42,0.2); width: 100%; max-width: 480px; overflow: hidden; }
-    .prop-modal-header { background: #2563eb; padding: 24px; color: white; display: flex; justify-content: space-between; align-items: flex-start; }
-    .prop-modal-header h3 { margin: 0 0 4px; font-size: 1.2rem; font-weight: 700; }
-    .prop-modal-header p { margin: 0; font-size: 0.88rem; opacity: 0.85; }
-    .prop-modal-close { background: rgba(255,255,255,0.2); border: none; color: white; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 1rem; flex-shrink: 0; }
-    .prop-modal-close:hover { background: rgba(255,255,255,0.3); }
-    .prop-modal-body { padding: 24px; }
-    .prop-modal-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f3f4f6; font-size: 0.92rem; }
-    .prop-modal-row:last-child { border-bottom: none; }
-    .prop-modal-row span:first-child { color: #6b7280; }
-    .prop-modal-row span:last-child { font-weight: 600; }
-    .prop-badge { display: inline-flex; padding: 4px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 700; background: #dcfce7; color: #16a34a; }
-    @@media (max-width: 900px) { .dash-stats { grid-template-columns: repeat(2, 1fr); } }
-    @@media (max-width: 540px) { .dash-stats { grid-template-columns: 1fr; } }
-</style>
+<div class="page-wrap">
+    <h1 class="page-title">Dashboard</h1>
 
-<div class="dash">
-    <h1 class="dash-title">Dashboard</h1>
-
-    <section class="dash-stats">
-        <div class="dash-card dash-stat">
-            <div class="dash-stat-label">Properties</div>
-            <div class="dash-stat-value">@totalProperties</div>
-            <div class="dash-stat-sub">Active properties</div>
+    <section class="stats-grid g4">
+        <div class="stat-card">
+            <div class="stat-label">Properties</div>
+            <div class="stat-value">@totalProperties</div>
+            <div class="stat-sub">Active properties</div>
         </div>
-        <div class="dash-card dash-stat">
-            <div class="dash-stat-label">Units</div>
-            <div class="dash-stat-value">@totalUnits</div>
-            <div class="dash-stat-sub">@occupiedUnits occupied</div>
+        <div class="stat-card">
+            <div class="stat-label">Units</div>
+            <div class="stat-value">@totalUnits</div>
+            <div class="stat-sub">@occupiedUnits occupied</div>
         </div>
-        <div class="dash-card dash-stat">
-            <div class="dash-stat-label">Active Leases</div>
-            <div class="dash-stat-value">@activeLeases</div>
-            <div class="dash-stat-sub">Current tenants</div>
+        <div class="stat-card">
+            <div class="stat-label">Active Leases</div>
+            <div class="stat-value">@activeLeases</div>
+            <div class="stat-sub">Current tenants</div>
         </div>
-        <div class="dash-card dash-stat">
-            <div class="dash-stat-label">Open Maintenance</div>
-            <div class="dash-stat-value">@openMaintenance</div>
-            <div class="dash-stat-sub">Requests pending</div>
+        <div class="stat-card">
+            <div class="stat-label">Open Maintenance</div>
+            <div class="stat-value">@openMaintenance</div>
+            <div class="stat-sub">Requests pending</div>
         </div>
     </section>
 
-    <div class="dash-card dash-map-card">
+    <div class="content-card map-card">
         <h2>Property Locations</h2>
         <div id="property-map"></div>
     </div>
 
-    <div class="dash-bottom">
-        <div class="dash-card dash-chart-card" style="grid-column: 1 / -1;">
+    <div class="sig-grid">
+        <div class="sig-card" id="ecb-rate">
+            <div class="stat-label">ECB Interest Rate</div>
+            <div class="sig-value">…</div>
+            <div class="stat-sub">Loading…</div>
+            <div class="sig-date"></div>
+        </div>
+        <div class="sig-card" id="hicp-value">
+            <div class="stat-label">Euro Area Inflation (HICP)</div>
+            <div class="sig-value">…</div>
+            <div class="stat-sub">Loading…</div>
+            <div class="sig-date"></div>
+        </div>
+        <div class="sig-card" id="eu-sentiment">
+            <div class="stat-label">EU Economic Sentiment (IE)</div>
+            <div class="sig-value">…</div>
+            <div class="stat-sub">Loading…</div>
+            <div class="sig-date"></div>
+        </div>
+        <div class="sig-card" id="euribor-value">
+            <div class="stat-label">EURIBOR 3-Month</div>
+            <div class="sig-value">…</div>
+            <div class="stat-sub">Loading…</div>
+            <div class="sig-date"></div>
+        </div>
+        <div class="sig-card" id="ire-sentiment">
+            <div class="stat-label">Ireland Consumer Sentiment</div>
+            <div class="sig-value">…</div>
+            <div class="stat-sub">Loading…</div>
+            <div class="sig-date"></div>
+        </div>
+    </div>
+
+    <div class="algo-card">
+        <h2>Suggested Market Rent</h2>
+        <p>Calculated from live ECB rates, HICP inflation and EU sentiment — updated on each page load.</p>
+        <div class="algo-result" id="suggested-rent">Calculating…</div>
+        <div id="rent-algo-breakdown"></div>
+    </div>
+
+    <div class="two-col-grid" style="margin-top:18px;">
+        <div class="content-card chart-card" style="grid-column: 1 / -1;">
             <h2>Rent Comparison — Europe vs Our Portfolio</h2>
             <p>Live data from the <strong>Eurostat Statistics API</strong> (dataset: prc_colc_rents, 2023) compared to our portfolio average of €@portfolioAvg/month.</p>
-            <div class="chart-toolbar">
-                <label for="building-filter">Dwelling type</label>
-                <select id="building-filter" class="chart-filter" disabled>
+            <div class="toolbar">
+                <label for="building-filter" style="font-size:0.82rem;font-weight:600;color:var(--grey);text-transform:uppercase;letter-spacing:0.05em;">Dwelling type</label>
+                <select id="building-filter" class="filter-select" disabled>
                     <option>Loading…</option>
                 </select>
             </div>
-            <div class="chart-status" style="color:#6b7280;font-size:0.88rem;margin-bottom:8px;"></div>
+            <div class="chart-status" style="color:var(--grey);font-size:0.88rem;margin-bottom:8px;"></div>
             <canvas id="rent-chart"></canvas>
         </div>
     </div>
@@ -96,37 +98,38 @@
 
 @if (selectedPin is not null)
 {
-    <div class="prop-modal-backdrop" @onclick="CloseModal">
-        <div class="prop-modal" @onclick:stopPropagation>
-            <div class="prop-modal-header">
+    <div class="modal-overlay" @onclick="CloseModal"></div>
+    <div class="modal-sheet" @onclick="CloseModal">
+        <div class="modal-box" style="max-width:480px;" @onclick:stopPropagation>
+            <div class="modal-blue-hdr">
                 <div>
                     <h3>@selectedPin.Name</h3>
                     <p>@selectedPin.Address, @selectedPin.City @selectedPin.ZipCode</p>
                 </div>
-                <button class="prop-modal-close" @onclick="CloseModal">✕</button>
+                <button class="modal-blue-close" @onclick="CloseModal">✕</button>
             </div>
-            <div class="prop-modal-body">
-                <div class="prop-modal-row">
+            <div class="modal-body-inner">
+                <div class="modal-detail-row">
                     <span>Status</span>
-                    <span><span class="prop-badge">Active</span></span>
+                    <span><span class="status-badge active">Active</span></span>
                 </div>
-                <div class="prop-modal-row">
+                <div class="modal-detail-row">
                     <span>Total Units</span>
                     <span>@selectedPin.UnitCount</span>
                 </div>
-                <div class="prop-modal-row">
+                <div class="modal-detail-row">
                     <span>Occupied Units</span>
                     <span>@selectedPin.OccupiedUnits</span>
                 </div>
-                <div class="prop-modal-row">
+                <div class="modal-detail-row">
                     <span>Vacancy</span>
                     <span>@(selectedPin.UnitCount - selectedPin.OccupiedUnits) units available</span>
                 </div>
-                <div class="prop-modal-row">
+                <div class="modal-detail-row">
                     <span>Contact Phone</span>
                     <span>@selectedPin.ContactPhone</span>
                 </div>
-                <div class="prop-modal-row">
+                <div class="modal-detail-row">
                     <span>Contact Email</span>
                     <span>@selectedPin.ContactEmail</span>
                 </div>
@@ -173,6 +176,7 @@
     {
         if (firstRender)
         {
+            await JS.InvokeVoidAsync("economicSignals.init");
             await JS.InvokeVoidAsync("rentChart.init", "rent-chart", portfolioAvg);
 
             if (pins.Count > 0)

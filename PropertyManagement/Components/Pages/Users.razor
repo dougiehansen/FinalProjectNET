@@ -4,121 +4,75 @@
 
 <PageTitle>User Management - PropertyMS</PageTitle>
 
-<style>
-    .um-page { max-width: 1200px; margin: 0 auto; padding: 32px 20px 48px; }
-    .um-topbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 28px; flex-wrap: wrap; }
-    .um-title-block h1 { margin: 0; font-size: 2rem; font-weight: 800; letter-spacing: -0.03em; }
-    .um-title-block p { margin: 8px 0 0; color: #6b7280; font-size: 0.98rem; }
-    .um-top-actions { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
-    .um-btn { border: 1px solid #e5e7eb; background: white; color: #1f2937; padding: 12px 16px; border-radius: 12px; font-weight: 600; cursor: pointer; transition: 0.2s ease; font-size: 0.9rem; }
-    .um-btn:hover { transform: translateY(-1px); box-shadow: 0 10px 30px rgba(15,23,42,0.06); }
-    .um-btn-primary { background: #2563eb; color: white; border-color: #2563eb; }
-    .um-btn-primary:hover { background: #1d4ed8; }
-    .um-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-bottom: 24px; }
-    .um-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 18px; box-shadow: 0 10px 30px rgba(15,23,42,0.06); }
-    .um-stat-card { padding: 20px; }
-    .um-stat-label { color: #6b7280; font-size: 0.92rem; margin-bottom: 10px; }
-    .um-stat-value { font-size: 1.9rem; font-weight: 800; letter-spacing: -0.03em; }
-    .um-stat-sub { margin-top: 8px; color: #6b7280; font-size: 0.9rem; }
-    .um-panel { padding: 20px; }
-    .um-filters { display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }
-    .um-search-box { flex: 1 1 320px; }
-    .um-search-box input { width: 100%; padding: 13px 16px; border-radius: 12px; border: 1px solid #e5e7eb; font-size: 0.95rem; outline: none; }
-    .um-search-box input:focus { border-color: #2563eb; box-shadow: 0 0 0 4px rgba(37,99,235,0.08); }
-    .um-filter-group { display: flex; gap: 12px; flex-wrap: wrap; }
-    .um-filter-select { padding: 13px 14px; border-radius: 12px; border: 1px solid #e5e7eb; background: white; color: #1f2937; min-width: 150px; outline: none; font-size: 0.9rem; }
-    .um-filter-select:focus { border-color: #2563eb; box-shadow: 0 0 0 4px rgba(37,99,235,0.08); }
-    .um-table-wrap { overflow-x: auto; }
-    .um-table { width: 100%; border-collapse: collapse; min-width: 820px; }
-    .um-table thead th { text-align: left; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.06em; color: #6b7280; padding: 14px 16px; border-bottom: 1px solid #e5e7eb; }
-    .um-table tbody td { padding: 18px 16px; border-bottom: 1px solid #eef2f7; vertical-align: middle; }
-    .um-table tbody tr:hover { background: #fafcff; }
-    .um-user-cell { display: flex; align-items: center; gap: 12px; }
-    .um-avatar { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; background: #eff6ff; color: #2563eb; font-weight: 700; font-size: 0.95rem; flex-shrink: 0; }
-    .um-user-meta strong { display: block; font-size: 0.96rem; }
-    .um-user-meta span { color: #6b7280; font-size: 0.88rem; }
-    .um-badge { display: inline-flex; align-items: center; padding: 7px 10px; border-radius: 999px; font-size: 0.82rem; font-weight: 700; }
-    .um-badge.active { background: #dcfce7; color: #16a34a; }
-    .um-badge.inactive { background: #fee2e2; color: #dc2626; }
-    .um-role { font-weight: 600; color: #374151; font-size: 0.9rem; }
-    .um-actions { display: flex; gap: 8px; justify-content: flex-end; }
-    .um-btn-sm { padding: 9px 12px; border-radius: 10px; font-size: 0.85rem; font-weight: 600; }
-    .um-btn-danger { background: #fee2e2; color: #dc2626; border-color: #fee2e2; }
-    .um-btn-danger:hover { background: #fecaca; }
-    .um-alert { padding: 14px 18px; border-radius: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
-    .um-alert-success { background: #dcfce7; color: #16a34a; }
-    .um-spinner { display: flex; justify-content: center; padding: 32px; }
-    @@media (max-width: 900px) { .um-stats { grid-template-columns: 1fr; } }
-    @@media (max-width: 640px) { .um-page { padding: 20px 14px 32px; } .um-title-block h1 { font-size: 1.6rem; } .um-panel { padding: 16px; } }
-</style>
+<div class="page-wrap">
 
-<div class="um-page">
-
-    <div class="um-topbar">
-        <div class="um-title-block">
+    <div class="page-hdr">
+        <div>
             <h1>User Management</h1>
             <p>Manage user accounts, roles, and account status from one clean admin view.</p>
         </div>
-        <div class="um-top-actions">
-            <button class="um-btn um-btn-primary" @onclick="OpenCreateForm">+ Add User</button>
-        </div>
+        <button class="btn-primary-action" @onclick="OpenCreateForm">+ Add User</button>
     </div>
 
     @if (!string.IsNullOrEmpty(successMsg))
     {
-        <div class="um-alert um-alert-success">
+        <div class="alert-banner success">
             <span>@successMsg</span>
-            <button class="um-btn um-btn-sm" @onclick="() => successMsg = string.Empty">✕</button>
+            <button class="btn-action sm" @onclick="() => successMsg = string.Empty">✕</button>
         </div>
     }
 
-    <section class="um-stats">
-        <div class="um-card um-stat-card">
-            <div class="um-stat-label">Total Users</div>
-            <div class="um-stat-value">@users.Count</div>
-            <div class="um-stat-sub">Across all account types</div>
+    <section class="stats-grid g3">
+        <div class="stat-card">
+            <div class="stat-label">Total Users</div>
+            <div class="stat-value">@users.Count</div>
+            <div class="stat-sub">Across all account types</div>
         </div>
-        <div class="um-card um-stat-card">
-            <div class="um-stat-label">Active Users</div>
-            <div class="um-stat-value">@users.Count(u => u.IsActive)</div>
-            <div class="um-stat-sub">Currently enabled accounts</div>
+        <div class="stat-card">
+            <div class="stat-label">Active Users</div>
+            <div class="stat-value">@users.Count(u => u.IsActive)</div>
+            <div class="stat-sub">Currently enabled accounts</div>
         </div>
-        <div class="um-card um-stat-card">
-            <div class="um-stat-label">Administrators</div>
-            <div class="um-stat-value">@users.Count(u => u.Role == UserRole.Administrator)</div>
-            <div class="um-stat-sub">Users with elevated access</div>
+        <div class="stat-card">
+            <div class="stat-label">Administrators</div>
+            <div class="stat-value">@users.Count(u => u.Role == UserRole.Administrator)</div>
+            <div class="stat-sub">Users with elevated access</div>
         </div>
     </section>
 
-    <section class="um-card um-panel">
-        <div class="um-filters">
-            <div class="um-search-box">
-                <input type="text" placeholder="Search by name or email..." @bind="searchText" @bind:event="oninput" />
+    <section class="content-card panel">
+        <div class="toolbar">
+            <div class="search-wrap">
+                <svg width="15" height="15" fill="none" viewBox="0 0 15 15" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--grey);pointer-events:none;">
+                    <circle cx="6.5" cy="6.5" r="5" stroke="currentColor" stroke-width="1.5"/>
+                    <path d="M10.5 10.5l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+                <input class="search-inp" type="text" placeholder="Search by name or email..." @bind="searchText" @bind:event="oninput" />
             </div>
-            <div class="um-filter-group">
-                <select class="um-filter-select" @bind="roleFilter">
-                    <option value="">All Roles</option>
-                    @foreach (var r in Enum.GetValues<UserRole>())
-                    {
-                        <option value="@r">@r</option>
-                    }
-                </select>
-                <select class="um-filter-select" @bind="statusFilter">
-                    <option value="">All Statuses</option>
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                </select>
-            </div>
+            <select class="filter-select" @bind="roleFilter">
+                <option value="">All Roles</option>
+                @foreach (var r in Enum.GetValues<UserRole>())
+                {
+                    <option value="@r">@r</option>
+                }
+            </select>
+            <select class="filter-select" @bind="statusFilter">
+                <option value="">All Statuses</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+            </select>
         </div>
 
-        <div class="um-table-wrap">
+        <div class="table-scroll">
             @if (loading)
             {
-                <div class="um-spinner"><div class="spinner-border text-primary"></div></div>
+                <div style="display:flex;justify-content:center;padding:32px;">
+                    <div class="spinner-border text-primary"></div>
+                </div>
             }
             else
             {
-                <table class="um-table">
+                <table class="data-table">
                     <thead>
                         <tr>
                             <th>User</th>
@@ -133,31 +87,31 @@
                         {
                             <tr>
                                 <td>
-                                    <div class="um-user-cell">
-                                        <div class="um-avatar">@Initials(u)</div>
-                                        <div class="um-user-meta">
+                                    <div class="user-cell">
+                                        <div class="user-initials">@Initials(u)</div>
+                                        <div class="user-meta">
                                             <strong>@u.FullName</strong>
                                             <span>@u.Email</span>
                                         </div>
                                     </div>
                                 </td>
-                                <td><span class="um-role">@u.Role</span></td>
+                                <td><span style="font-weight:600;font-size:0.9rem;color:#374151">@u.Role</span></td>
                                 <td>
-                                    <span class="um-badge @(u.IsActive ? "active" : "inactive")">
+                                    <span class="status-badge @(u.IsActive ? "active" : "inactive")">
                                         @(u.IsActive ? "Active" : "Inactive")
                                     </span>
                                 </td>
-                                <td style="color:#6b7280;font-size:0.9rem;">@(u.LastLogin?.ToString("dd MMM yyyy, HH:mm") ?? "Never")</td>
+                                <td style="color:var(--grey);font-size:0.9rem;">@(u.LastLogin?.ToString("dd MMM yyyy, HH:mm") ?? "Never")</td>
                                 <td>
-                                    <div class="um-actions">
-                                        <button class="um-btn um-btn-sm" @onclick="() => OpenEditForm(u)">Edit</button>
+                                    <div class="action-btns">
+                                        <button class="btn-action sm" @onclick="() => OpenEditForm(u)">Edit</button>
                                         @if (u.IsActive)
                                         {
-                                            <button class="um-btn um-btn-sm um-btn-danger" @onclick="() => Deactivate(u.Id)">Disable</button>
+                                            <button class="btn-action sm danger" @onclick="() => Deactivate(u.Id)">Disable</button>
                                         }
                                         else
                                         {
-                                            <button class="um-btn um-btn-sm um-btn-primary" @onclick="() => Activate(u.Id)">Activate</button>
+                                            <button class="btn-action sm primary" @onclick="() => Activate(u.Id)">Activate</button>
                                         }
                                     </div>
                                 </td>

@@ -1,0 +1,251 @@
+@page "/tenants"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Administrator,PropertyManager")]
+@inject ITenantService TenantService
+
+<PageTitle>Tenants - PropertyMS</PageTitle>
+
+<div class="page-wrap">
+
+    <!-- Page Header -->
+    <div class="page-hdr">
+        <div>
+            <h1>Tenants</h1>
+            <p>@tenants.Count @(tenants.Count == 1 ? "tenant" : "tenants") &nbsp;·&nbsp; @tenants.Count(t => t.IsActive) active</p>
+        </div>
+        <button class="btn-primary-action" @onclick="() => OpenForm()">
+            <svg width="14" height="14" fill="none" viewBox="0 0 14 14"><path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            Add Tenant
+        </button>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid g3">
+        <div class="stat-card">
+            <div class="stat-label">Total Tenants</div>
+            <div class="stat-value">@tenants.Count</div>
+            <div class="stat-sub">All records</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Active</div>
+            <div class="stat-value">@tenants.Count(t => t.IsActive)</div>
+            <div class="stat-sub">Current tenants</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Inactive</div>
+            <div class="stat-value">@tenants.Count(t => !t.IsActive)</div>
+            <div class="stat-sub">Former tenants</div>
+        </div>
+    </div>
+
+    <!-- Alert -->
+    @if (!string.IsNullOrEmpty(successMsg))
+    {
+        <div class="alert-banner success">
+            <span>@successMsg</span>
+            <button class="btn-action sm" @onclick="() => successMsg = string.Empty">✕</button>
+        </div>
+    }
+
+    <!-- Table Card -->
+    <div class="content-card panel">
+        @if (loading)
+        {
+            <div style="display:flex;justify-content:center;padding:32px;">
+                <div class="spinner-border text-primary"></div>
+            </div>
+        }
+        else if (!tenants.Any())
+        {
+            <div class="empty-state">
+                <div class="empty-icon">👤</div>
+                <h3>No tenants yet</h3>
+                <p>Add your first tenant to get started.</p>
+            </div>
+        }
+        else
+        {
+            <div class="toolbar">
+                <div class="search-wrap">
+                    <svg width="15" height="15" fill="none" viewBox="0 0 15 15">
+                        <circle cx="6.5" cy="6.5" r="5" stroke="currentColor" stroke-width="1.5"/>
+                        <path d="M10.5 10.5l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    </svg>
+                    <input class="search-inp" placeholder="Search by name or email…"
+                           value="@searchTerm" @oninput="e => searchTerm = e.Value?.ToString() ?? string.Empty" />
+                </div>
+            </div>
+
+            <div class="table-scroll">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Tenant</th>
+                            <th>Phone</th>
+                            <th>Employer</th>
+                            <th>Status</th>
+                            <th style="text-align:right;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var t in FilteredTenants)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="user-cell">
+                                        <div class="user-initials">@t.FirstName[0]@t.LastName[0]</div>
+                                        <div class="user-meta">
+                                            <strong>@t.FullName</strong>
+                                            <span>@t.Email</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td style="color:var(--grey);font-size:0.9rem;">@(string.IsNullOrEmpty(t.Phone) ? "—" : t.Phone)</td>
+                                <td style="color:var(--grey);font-size:0.9rem;">@(string.IsNullOrEmpty(t.EmployerName) ? "—" : t.EmployerName)</td>
+                                <td>
+                                    <span class="status-badge @(t.IsActive ? "active" : "inactive")">
+                                        @(t.IsActive ? "Active" : "Inactive")
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="action-btns">
+                                        <button class="btn-action sm" @onclick="() => OpenForm(t)">Edit</button>
+                                        @if (t.IsActive)
+                                        {
+                                            <button class="btn-action sm danger" @onclick="() => Deactivate(t.Id)">Deactivate</button>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+
+</div>
+
+<!-- Tenant Modal -->
+@if (showForm)
+{
+    <div class="modal-overlay" @onclick="() => showForm = false"></div>
+    <div class="modal-sheet" @onclick="() => showForm = false">
+        <div class="modal-box" style="max-width:640px;" @onclick:stopPropagation="true">
+            <div class="modal-top">
+                <h2>@(editing.Id == 0 ? "Add Tenant" : "Edit Tenant")</h2>
+                <button class="modal-close" @onclick="() => showForm = false">✕</button>
+            </div>
+            <div class="modal-body-inner">
+                @if (!string.IsNullOrEmpty(formError))
+                {
+                    <div class="field-error">@formError</div>
+                }
+                <div style="display:flex;flex-direction:column;gap:14px;">
+                    <div class="field-row c2">
+                        <div class="field-group">
+                            <label class="field-label">First Name *</label>
+                            <input class="field-input" @bind="editing.FirstName" placeholder="Jane" />
+                        </div>
+                        <div class="field-group">
+                            <label class="field-label">Last Name *</label>
+                            <input class="field-input" @bind="editing.LastName" placeholder="Smith" />
+                        </div>
+                    </div>
+                    <div class="field-row c2">
+                        <div class="field-group">
+                            <label class="field-label">Email *</label>
+                            <input class="field-input" type="email" @bind="editing.Email" placeholder="jane@example.com" />
+                        </div>
+                        <div class="field-group">
+                            <label class="field-label">Phone</label>
+                            <input class="field-input" @bind="editing.Phone" placeholder="+353 87 123 4567" />
+                        </div>
+                    </div>
+                    <div class="field-row c2">
+                        <div class="field-group">
+                            <label class="field-label">Date of Birth</label>
+                            <input class="field-input" type="date" @bind="editing.DateOfBirth" />
+                        </div>
+                        <div class="field-group">
+                            <label class="field-label">Employer Name</label>
+                            <input class="field-input" @bind="editing.EmployerName" placeholder="Acme Ltd." />
+                        </div>
+                    </div>
+                    <div class="field-row c2">
+                        <div class="field-group">
+                            <label class="field-label">Employer Phone</label>
+                            <input class="field-input" @bind="editing.EmployerPhone" placeholder="+353 1 234 5678" />
+                        </div>
+                        <div class="field-group">
+                            <label class="field-label">Emergency Contact Name</label>
+                            <input class="field-input" @bind="editing.EmergencyContactName" placeholder="John Smith" />
+                        </div>
+                    </div>
+                    <div class="field-group">
+                        <label class="field-label">Emergency Contact Phone</label>
+                        <input class="field-input" @bind="editing.EmergencyContactPhone" placeholder="+353 87 999 8888" />
+                    </div>
+                    <div class="field-group">
+                        <label class="field-label">Notes</label>
+                        <textarea class="field-input" rows="2" @bind="editing.Notes" placeholder="Any additional notes…" style="resize:vertical;"></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-foot">
+                <button class="btn-cancel" @onclick="() => showForm = false">Cancel</button>
+                <button class="btn-save" @onclick="Save">@(editing.Id == 0 ? "Add Tenant" : "Save Changes")</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    bool loading = true, showForm;
+    List<Tenant> tenants = new();
+    Tenant editing = new();
+    string successMsg = string.Empty, formError = string.Empty, searchTerm = string.Empty;
+
+    IEnumerable<Tenant> FilteredTenants => string.IsNullOrWhiteSpace(searchTerm)
+        ? tenants
+        : tenants.Where(t => t.FullName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)
+                           || t.Email.Contains(searchTerm, StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnInitializedAsync()
+    {
+        tenants = await TenantService.GetAllAsync();
+        loading = false;
+    }
+
+    void OpenForm(Tenant? t = null)
+    {
+        editing = t != null
+            ? new Tenant { Id = t.Id, FirstName = t.FirstName, LastName = t.LastName, Email = t.Email, Phone = t.Phone, DateOfBirth = t.DateOfBirth, EmployerName = t.EmployerName, EmployerPhone = t.EmployerPhone, EmergencyContactName = t.EmergencyContactName, EmergencyContactPhone = t.EmergencyContactPhone, Notes = t.Notes, IsActive = t.IsActive }
+            : new Tenant();
+        formError = string.Empty;
+        showForm = true;
+    }
+
+    async Task Save()
+    {
+        if (string.IsNullOrWhiteSpace(editing.FirstName) || string.IsNullOrWhiteSpace(editing.LastName) || string.IsNullOrWhiteSpace(editing.Email))
+        {
+            formError = "First name, last name, and email are required.";
+            return;
+        }
+        if (editing.Id == 0)
+            await TenantService.CreateAsync(editing);
+        else
+            await TenantService.UpdateAsync(editing);
+
+        showForm = false;
+        successMsg = editing.Id == 0 ? "Tenant added." : "Tenant updated.";
+        tenants = await TenantService.GetAllAsync();
+    }
+
+    async Task Deactivate(int id)
+    {
+        await TenantService.DeactivateAsync(id);
+        successMsg = "Tenant deactivated.";
+        tenants = await TenantService.GetAllAsync();
+    }
+}

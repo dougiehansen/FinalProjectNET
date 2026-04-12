@@ -52,6 +52,7 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IPropertyService, PropertyService>();
 builder.Services.AddScoped<IUnitService, UnitService>();
 builder.Services.AddScoped<ILeaseService, LeaseService>();
+builder.Services.AddScoped<ITenantService, TenantService>();
 
 var app = builder.Build();
 

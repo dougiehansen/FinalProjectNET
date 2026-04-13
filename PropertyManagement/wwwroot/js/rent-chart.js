@@ -17,9 +17,7 @@ window.rentChart = {
         this._portfolioAvg = portfolioAvg;
         this._canvasId = canvasId;
 
-        const url =
-            'https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/prc_colc_rents' +
-            '?lang=EN&currency=EUR&time=2023';
+        const url = '/api/eurostat/statistics/1.0/data/prc_colc_rents?lang=EN&currency=EUR&time=2023';
 
         const targets = [
             'Dublin', 'Amsterdam', 'Berlin', 'Munich', 'Hamburg',

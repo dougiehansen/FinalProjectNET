@@ -152,7 +152,9 @@
         occupiedUnits   = await Db.Units.CountAsync(u => u.IsActive && u.IsOccupied);
         activeLeases    = await Db.Leases.CountAsync(l => l.Status == LeaseStatus.Active);
         openMaintenance = await Db.MaintenanceRequests.CountAsync(m => m.Status == MaintenanceStatus.Open || m.Status == MaintenanceStatus.InProgress);
-        portfolioAvg    = Math.Round(await Db.Units.Where(u => u.IsActive).AverageAsync(u => u.MonthlyRent), 0);
+        portfolioAvg    = await Db.Units.AnyAsync(u => u.IsActive)
+            ? Math.Round(await Db.Units.Where(u => u.IsActive).AverageAsync(u => u.MonthlyRent), 0)
+            : 0;
 
         pins = await Db.Properties
             .Where(p => p.IsActive && p.Latitude != 0)
@@ -176,14 +178,14 @@
     {
         if (firstRender)
         {
-            await JS.InvokeVoidAsync("economicSignals.init");
-            await JS.InvokeVoidAsync("rentChart.init", "rent-chart", portfolioAvg);
-
-            if (pins.Count > 0)
+            try { await JS.InvokeVoidAsync("economicSignals.init"); } catch { }
+            try { await JS.InvokeVoidAsync("rentChart.init", "rent-chart", portfolioAvg); } catch { }
+            try
             {
                 dotNetRef = DotNetObjectReference.Create(this);
                 await JS.InvokeVoidAsync("leafletMap.init", "property-map", pins, dotNetRef);
             }
+            catch { }
         }
     }
 

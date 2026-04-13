@@ -27,6 +27,16 @@ window.leafletMap = {
             iconAnchor: [18, 18]
         });
 
+        if (properties.length === 0) {
+            const msg = L.divIcon({
+                className: '',
+                html: '<div style="background:#fff;padding:8px 14px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.18);font-size:13px;color:#6b7280;white-space:nowrap;">No properties with coordinates yet</div>',
+                iconAnchor: [110, 16]
+            });
+            L.marker([53.3461, -6.2675], { icon: msg }).addTo(map);
+            return;
+        }
+
         properties.forEach(function (p) {
             L.marker([p.latitude, p.longitude], { icon })
                 .addTo(map)

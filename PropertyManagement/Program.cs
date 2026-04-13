@@ -48,6 +48,17 @@ builder.Services.AddRazorPages();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+builder.Services.AddHttpClient("ecb", c =>
+{
+    c.BaseAddress = new Uri("https://data-api.ecb.europa.eu/");
+    c.DefaultRequestHeaders.Add("Accept", "application/json");
+});
+builder.Services.AddHttpClient("eurostat", c =>
+{
+    c.BaseAddress = new Uri("https://ec.europa.eu/");
+    c.DefaultRequestHeaders.Add("Accept", "application/json");
+});
+
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IPropertyService, PropertyService>();
 builder.Services.AddScoped<IUnitService, UnitService>();
@@ -99,5 +110,37 @@ app.MapStaticAssets();
 app.MapRazorPages();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+
+app.MapGet("/api/ecb/{**path}", async (string path, HttpRequest req, IHttpClientFactory factory) =>
+{
+    var http = factory.CreateClient("ecb");
+    var query = req.QueryString.Value ?? "";
+    try
+    {
+        var res = await http.GetAsync($"service/data/{path}{query}");
+        var body = await res.Content.ReadAsStringAsync();
+        return Results.Content(body, "application/json");
+    }
+    catch
+    {
+        return Results.StatusCode(502);
+    }
+}).RequireAuthorization();
+
+app.MapGet("/api/eurostat/{**path}", async (string path, HttpRequest req, IHttpClientFactory factory) =>
+{
+    var http = factory.CreateClient("eurostat");
+    var query = req.QueryString.Value ?? "";
+    try
+    {
+        var res = await http.GetAsync($"eurostat/api/dissemination/{path}{query}");
+        var body = await res.Content.ReadAsStringAsync();
+        return Results.Content(body, "application/json");
+    }
+    catch
+    {
+        return Results.StatusCode(502);
+    }
+}).RequireAuthorization();
 
 app.Run();

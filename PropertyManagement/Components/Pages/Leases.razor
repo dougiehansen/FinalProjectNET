@@ -1,0 +1,344 @@
+1@page "/leases"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Administrator,PropertyManager")]
+@inject ILeaseService LeaseService
+@inject ITenantService TenantService
+@inject IUnitService UnitService
+@inject IPropertyService PropertyService
+@using PropertyManagement.Models
+
+<PageTitle>Leases - PropertyMS</PageTitle>
+
+<div class="page-wrap">
+
+    <!-- Page header: title, subtitle count, and primary action button -->
+    <div class="page-hdr">
+        <div>
+            <h1>Leases</h1>
+            <p>@leases.Count @(leases.Count == 1 ? "lease" : "leases") &nbsp;·&nbsp; @leases.Count(l => l.Status == LeaseStatus.Active) active</p>
+        </div>
+        <button class="btn-primary-action" @onclick="OpenCreateForm">
+            <svg width="14" height="14" fill="none" viewBox="0 0 14 14">
+                <path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            Create Lease
+        </button>
+    </div>
+
+    <!-- Stats strip: four key metrics derived from the loaded lease list -->
+    <div class="stats-grid g4">
+        <div class="stat-card">
+            <div class="stat-label">Total Leases</div>
+            <div class="stat-value">@leases.Count</div>
+            <div class="stat-sub">All records</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Active</div>
+            <div class="stat-value">@leases.Count(l => l.Status == LeaseStatus.Active)</div>
+            <div class="stat-sub">Current leases</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Expiring Soon</div>
+            <div class="stat-value">@leases.Count(l => l.IsExpiringSoon)</div>
+            <div class="stat-sub">Within 60 days</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Expired / Terminated</div>
+            <div class="stat-value">@leases.Count(l => l.Status == LeaseStatus.Expired || l.Status == LeaseStatus.Terminated)</div>
+            <div class="stat-sub">Closed leases</div>
+        </div>
+    </div>
+
+    <!-- Success alert, dismissed by clearing the message string -->
+    @if (!string.IsNullOrEmpty(successMsg))
+    {
+        <div class="alert-banner success">
+            <span>@successMsg</span>
+            <button class="btn-action sm" @onclick="() => successMsg = string.Empty">✕</button>
+        </div>
+    }
+
+    <!-- Lease table card -->
+    <div class="content-card panel">
+        @if (loading)
+        {
+            <div style="display:flex;justify-content:center;padding:32px;">
+                <div class="spinner-border text-primary"></div>
+            </div>
+        }
+        else if (!leases.Any())
+        {
+            <div class="empty-state">
+                <div class="empty-icon">📋</div>
+                <h3>No leases yet</h3>
+                <p>Create your first lease to get started.</p>
+            </div>
+        }
+        else
+        {
+            <div class="table-scroll">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Tenant</th>
+                            <th>Property</th>
+                            <th>Unit</th>
+                            <th>Rent / mo</th>
+                            <th>Start</th>
+                            <th>End</th>
+                            <th>Status</th>
+                            <th style="text-align:right;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var l in leases)
+                        {
+                            <!-- Rows expiring within 60 days are highlighted in orange -->
+                            <tr style="@(l.IsExpiringSoon ? "background:var(--orange-lt);" : "")">
+                                <td>
+                                    <div class="user-cell">
+                                        <div class="user-initials">@l.Tenant.FirstName[0]@l.Tenant.LastName[0]</div>
+                                        <div class="user-meta">
+                                            <strong>@l.Tenant.FullName</strong>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>@l.Unit.Property.Name</td>
+                                <td>@l.Unit.UnitNumber</td>
+                                <td>€@l.MonthlyRent.ToString("N0")</td>
+                                <td>@l.StartDate.ToString("dd MMM yyyy")</td>
+                                <td>
+                                    @l.EndDate.ToString("dd MMM yyyy")
+                                    @if (l.IsExpiringSoon)
+                                    {
+                                        <span class="status-badge warning" style="margin-left:6px;font-size:0.72rem;">Expiring Soon</span>
+                                    }
+                                </td>
+                                <td><span class="status-badge @GetStatusClass(l.Status)">@l.Status</span></td>
+                                <td>
+                                    <div class="action-btns">
+                                        <button class="btn-action sm" @onclick="() => OpenEditForm(l)">Edit</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+
+</div>
+
+<!-- Create / Edit modal -->
+@if (showForm)
+{
+    <div class="modal-overlay" @onclick="() => showForm = false"></div>
+    <div class="modal-sheet" @onclick="() => showForm = false">
+        <div class="modal-box" style="max-width:680px;" @onclick:stopPropagation="true">
+
+            <div class="modal-top">
+                <h2>@(editing.Id == 0 ? "Create Lease" : "Edit Lease")</h2>
+                <button class="modal-close" @onclick="() => showForm = false">✕</button>
+            </div>
+
+            <div class="modal-body-inner">
+                @if (!string.IsNullOrEmpty(formError))
+                {
+                    <div class="field-error">@formError</div>
+                }
+
+                <div style="display:flex;flex-direction:column;gap:14px;">
+
+                    <!-- Tenant and Property are selected first; selecting a property
+                         triggers OnPropertySelected which loads the unit dropdown -->
+                    <div class="field-row c2">
+                        <div class="field-group">
+                            <label class="field-label">Tenant *</label>
+                            <select class="field-select" @bind="editing.TenantId">
+                                <option value="0">Select tenant…</option>
+                                @foreach (var t in allTenants)
+                                {
+                                    <option value="@t.Id">@t.FullName</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="field-group">
+                            <label class="field-label">Property *</label>
+                            <select class="field-select" value="@selectedPropertyId" @onchange="OnPropertySelected">
+                                <option value="0">Select property…</option>
+                                @foreach (var p in allProperties)
+                                {
+                                    <option value="@p.Id">@p.Name</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="field-row c2">
+                        <!-- Unit dropdown is populated after a property is chosen -->
+                        <div class="field-group">
+                            <label class="field-label">Unit *</label>
+                            <select class="field-select" @bind="editing.UnitId" disabled="@(availableUnits.Count == 0)">
+                                <option value="0">@(selectedPropertyId == 0 ? "Select property first…" : "Select unit…")</option>
+                                @foreach (var u in availableUnits)
+                                {
+                                    <option value="@u.Id">@u.UnitNumber – @u.Type (€@u.MonthlyRent/mo)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="field-group">
+                            <label class="field-label">Status</label>
+                            <select class="field-select" @bind="editing.Status">
+                                @foreach (var s in Enum.GetValues<LeaseStatus>())
+                                {
+                                    <option value="@s">@s</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="field-row c2">
+                        <div class="field-group">
+                            <label class="field-label">Start Date *</label>
+                            <input class="field-input" type="date" @bind="editing.StartDate" />
+                        </div>
+                        <div class="field-group">
+                            <label class="field-label">End Date *</label>
+                            <input class="field-input" type="date" @bind="editing.EndDate" />
+                        </div>
+                    </div>
+
+                    <div class="field-row c2">
+                        <div class="field-group">
+                            <label class="field-label">Monthly Rent (€) *</label>
+                            <input class="field-input" type="number" @bind="editing.MonthlyRent" step="0.01" min="0" />
+                        </div>
+                        <div class="field-group">
+                            <label class="field-label">Security Deposit (€)</label>
+                            <input class="field-input" type="number" @bind="editing.SecurityDeposit" step="0.01" min="0" />
+                        </div>
+                    </div>
+
+                    <div class="field-group">
+                        <label class="field-label">Notes</label>
+                        <textarea class="field-input" rows="2" @bind="editing.Notes" style="resize:vertical;"></textarea>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="modal-foot">
+                <button class="btn-cancel" @onclick="() => showForm = false">Cancel</button>
+                <button class="btn-save" @onclick="Save">@(editing.Id == 0 ? "Create Lease" : "Save Changes")</button>
+            </div>
+
+        </div>
+    </div>
+}
+
+@code {
+    bool loading = true, showForm;
+    List<Lease> leases        = new();
+    List<Tenant> allTenants   = new();
+    List<Property> allProperties = new();
+    List<Unit> availableUnits = new();
+    Lease editing             = new();
+    int selectedPropertyId;
+    string successMsg = string.Empty, formError = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Load reference data for the dropdowns alongside the lease list
+        await LoadLeases();
+        allTenants    = await TenantService.GetAllAsync();
+        allProperties = await PropertyService.GetAllAsync();
+        loading       = false;
+    }
+
+    async Task LoadLeases() => leases = await LeaseService.GetAllAsync();
+
+    void OpenCreateForm()
+    {
+        // Default dates: today → one year from today
+        editing = new Lease { StartDate = DateTime.Today, EndDate = DateTime.Today.AddYears(1) };
+        selectedPropertyId = 0;
+        availableUnits     = new();
+        formError          = string.Empty;
+        showForm           = true;
+    }
+
+    async Task OpenEditForm(Lease l)
+    {
+        // Copy into a new object so the table row is not mutated while editing
+        editing = new Lease
+        {
+            Id = l.Id, TenantId = l.TenantId, UnitId = l.UnitId,
+            StartDate = l.StartDate, EndDate = l.EndDate,
+            MonthlyRent = l.MonthlyRent, SecurityDeposit = l.SecurityDeposit,
+            Status = l.Status, Notes = l.Notes
+        };
+        selectedPropertyId = l.Unit.PropertyId;
+        availableUnits     = await UnitService.GetByPropertyAsync(selectedPropertyId);
+        formError          = string.Empty;
+        showForm           = true;
+    }
+
+    async Task OnPropertySelected(ChangeEventArgs e)
+    {
+        selectedPropertyId = int.Parse(e.Value?.ToString() ?? "0");
+
+        // Reload units for the chosen property and reset the unit selection
+        availableUnits = selectedPropertyId > 0
+            ? await UnitService.GetByPropertyAsync(selectedPropertyId)
+            : new();
+        editing.UnitId = 0;
+    }
+
+    async Task Save()
+    {
+        // Basic field validation before hitting the database
+        if (editing.TenantId == 0 || editing.UnitId == 0 || editing.MonthlyRent <= 0)
+        {
+            formError = "Tenant, unit, and a positive monthly rent are required.";
+            return;
+        }
+        if (editing.EndDate <= editing.StartDate)
+        {
+            formError = "End date must be after start date.";
+            return;
+        }
+
+        if (editing.Id == 0)
+        {
+            // New lease: check the unit is not already occupied by an active lease
+            if (await LeaseService.UnitHasActiveLease(editing.UnitId))
+            {
+                formError = "This unit already has an active lease. Select a different unit or update the existing lease first.";
+                return;
+            }
+            await LeaseService.CreateAsync(editing);
+            successMsg = "Lease created successfully.";
+        }
+        else
+        {
+            // Edit: pass the current lease ID so it excludes itself from the active-lease check inside UpdateAsync
+            await LeaseService.UpdateAsync(editing);
+            successMsg = "Lease updated successfully.";
+        }
+
+        showForm = false;
+        await LoadLeases();
+    }
+
+    /// <summary>
+    /// Maps each LeaseStatus value to the corresponding theme.css
+    /// status-badge modifier class defined in theme.css.
+    /// </summary>
+    string GetStatusClass(LeaseStatus s) => s switch
+    {
+        LeaseStatus.Active     => "active",
+        LeaseStatus.Expired    => "expired",
+        LeaseStatus.Terminated => "terminated",
+        _                      => "expired"
+    };
+}

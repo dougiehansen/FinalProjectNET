@@ -13,4 +13,10 @@ public interface IUserService
     Task UpdateAsync(User user, string? newPassword = null);
     Task DeactivateAsync(int userId);
     Task ActivateAsync(int userId);
+
+    /// <summary>
+    /// Returns all active users with the given role — used to populate
+    /// the maintenance staff assignment dropdown.
+    /// </summary>
+    Task<List<User>> GetByRoleAsync(UserRole role);
 }

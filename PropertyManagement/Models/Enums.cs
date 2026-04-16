@@ -10,6 +10,7 @@ public enum LeaseStatus
 public enum MaintenanceStatus
 {
     Open,
+    Assigned,
     InProgress,
     Completed,
     Cancelled

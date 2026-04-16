@@ -83,4 +83,11 @@ public class UserService : IUserService
             await _db.SaveChangesAsync();
         }
     }
+
+    /// <inheritdoc/>
+    public async Task<List<User>> GetByRoleAsync(UserRole role) =>
+        await _db.Users
+            .Where(u => u.Role == role && u.IsActive)
+            .OrderBy(u => u.LastName)
+            .ToListAsync();
 }

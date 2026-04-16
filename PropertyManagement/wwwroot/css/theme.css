@@ -176,6 +176,7 @@
 .status-badge.warning    { background: var(--orange-lt); color: var(--orange); }
 .status-badge.expired    { background: var(--grey-lt);   color: var(--grey); }
 .status-badge.terminated { background: var(--red-lt);    color: var(--red); }
+.status-badge.info       { background: #dbeafe;          color: #1d4ed8; }
 
 /* ══════════════════════════════
    Avatar & User Cell

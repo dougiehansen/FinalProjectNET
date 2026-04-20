@@ -37,4 +37,11 @@ public interface ILeaseService
     /// in sync — sets IsOccupied true for Active leases, false for all others.
     /// </summary>
     Task UpdateAsync(Lease lease);
+
+    /// <summary>
+    /// Calculates the current outstanding balance for a lease as:
+    /// (months active × monthly rent) − total payments received.
+    /// Used by the Rent Payments form to show the tenant's current debt.
+    /// </summary>
+    Task<decimal> GetOutstandingBalanceAsync(int leaseId);
 }

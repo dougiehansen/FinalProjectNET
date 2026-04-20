@@ -52,6 +52,22 @@ public class LeaseService : ILeaseService
     }
 
     /// <inheritdoc/>
+    public async Task<decimal> GetOutstandingBalanceAsync(int leaseId)
+    {
+        var lease = await _db.Leases
+            .Include(l => l.RentPayments)
+            .FirstOrDefaultAsync(l => l.Id == leaseId);
+
+        if (lease == null) return 0;
+
+        var monthsActive = (int)Math.Max(1,
+            Math.Floor((DateTime.Today - lease.StartDate).TotalDays / 30.44));
+        var totalExpected = monthsActive * lease.MonthlyRent;
+        var totalPaid = lease.RentPayments.Sum(p => p.Amount);
+        return Math.Max(0, totalExpected - totalPaid);
+    }
+
+    /// <inheritdoc/>
     public async Task UpdateAsync(Lease lease)
     {
         var existing = await _db.Leases.FindAsync(lease.Id);

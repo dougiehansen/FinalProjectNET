@@ -1,4 +1,4 @@
-1@page "/leases"
+@page "/leases"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Administrator,PropertyManager")]
 @inject ILeaseService LeaseService
 @inject ITenantService TenantService

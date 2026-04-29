@@ -1,5 +1,7 @@
 
 
+*.md
+
 # Build output
 bin/
 obj/

@@ -101,6 +101,10 @@
     <div class="modal-overlay" @onclick="CloseModal"></div>
     <div class="modal-sheet" @onclick="CloseModal">
         <div class="modal-box" style="max-width:480px;" @onclick:stopPropagation>
+            @if (!string.IsNullOrEmpty(selectedPin.ImagePath))
+            {
+                <img src="@selectedPin.ImagePath" style="width:100%;height:180px;object-fit:cover;border-radius:12px 12px 0 0;" alt="@selectedPin.Name" />
+            }
             <div class="modal-blue-hdr">
                 <div>
                     <h3>@selectedPin.Name</h3>
@@ -166,6 +170,7 @@
                 ZipCode       = p.ZipCode,
                 ContactPhone  = p.ContactPhone,
                 ContactEmail  = p.ContactEmail,
+                ImagePath     = p.ImagePath,
                 Latitude      = p.Latitude,
                 Longitude     = p.Longitude,
                 UnitCount     = p.Units.Count(u => u.IsActive),
@@ -202,15 +207,16 @@
 
     record PropertyMapPin
     {
-        public string Name          { get; init; } = string.Empty;
-        public string Address       { get; init; } = string.Empty;
-        public string City          { get; init; } = string.Empty;
-        public string ZipCode       { get; init; } = string.Empty;
-        public string ContactPhone  { get; init; } = string.Empty;
-        public string ContactEmail  { get; init; } = string.Empty;
-        public double Latitude      { get; init; }
-        public double Longitude     { get; init; }
-        public int    UnitCount     { get; init; }
-        public int    OccupiedUnits { get; init; }
+        public string  Name          { get; init; } = string.Empty;
+        public string  Address       { get; init; } = string.Empty;
+        public string  City          { get; init; } = string.Empty;
+        public string  ZipCode       { get; init; } = string.Empty;
+        public string  ContactPhone  { get; init; } = string.Empty;
+        public string  ContactEmail  { get; init; } = string.Empty;
+        public string? ImagePath     { get; init; }
+        public double  Latitude      { get; init; }
+        public double  Longitude     { get; init; }
+        public int     UnitCount     { get; init; }
+        public int     OccupiedUnits { get; init; }
     }
 }

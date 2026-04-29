@@ -35,6 +35,7 @@ public class PropertyService : IPropertyService
         existing.ZipCode      = property.ZipCode;
         existing.ContactPhone = property.ContactPhone;
         existing.ContactEmail = property.ContactEmail;
+        existing.ImagePath    = property.ImagePath;
 
         await _db.SaveChangesAsync();
     }

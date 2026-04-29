@@ -30,6 +30,8 @@ public class Property
     public double Latitude { get; set; }
     public double Longitude { get; set; }
 
+    public string? ImagePath { get; set; }
+
     public bool IsActive { get; set; } = true;
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

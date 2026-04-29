@@ -4,6 +4,7 @@
 @inject IUnitService UnitService
 @inject ILeaseService LeaseService
 @inject NavigationManager Nav
+@inject IWebHostEnvironment Env
 
 <PageTitle>Properties - PropertyMS</PageTitle>
 
@@ -135,6 +136,10 @@
 
             <div class="prop-card @(!prop.IsActive ? "inactive" : "")">
                 <div class="prop-hdr" @onclick="() => ToggleExpand(pid)">
+                    @if (!string.IsNullOrEmpty(prop.ImagePath))
+                    {
+                        <img src="@prop.ImagePath" class="prop-thumb" alt="@prop.Name" />
+                    }
                     <div class="prop-info">
                         <div class="prop-name">@prop.Name</div>
                         <div class="prop-addr">
@@ -312,6 +317,17 @@
                             <input class="field-input" type="email" @bind="editProp.ContactEmail" placeholder="manager@example.com" />
                         </div>
                     </div>
+                    <div class="field-row">
+                        <div class="field-group">
+                            <label class="field-label">Property Photo</label>
+                            @if (!string.IsNullOrEmpty(editProp.ImagePath))
+                            {
+                                <img src="@editProp.ImagePath" style="width:100%;max-height:160px;object-fit:cover;border-radius:8px;margin-bottom:8px;" alt="Current photo" />
+                            }
+                            <InputFile class="field-input" accept="image/jpeg,image/png,image/webp" OnChange="HandleImageSelected" style="padding:6px;" />
+                            @if (!string.IsNullOrEmpty(imageErr)) { <div class="field-error" style="margin-top:4px;">@imageErr</div> }
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="modal-foot">
@@ -427,6 +443,8 @@
     Unit editUnit = new();
     Property? confirmTarget;
     string propErr = string.Empty, unitErr = string.Empty;
+    IBrowserFile? pendingImage;
+    string imageErr = string.Empty;
 
     // Computed
     List<Unit> AllUnits      => properties.Where(p => p.IsActive).SelectMany(p => p.Units.Where(u => u.IsActive)).ToList();
@@ -521,10 +539,22 @@
     void OpenPropertyForm(Property? p = null)
     {
         editProp = p != null
-            ? new Property { Id = p.Id, Name = p.Name, Address = p.Address, City = p.City, State = p.State, ZipCode = p.ZipCode, ContactPhone = p.ContactPhone, ContactEmail = p.ContactEmail, IsActive = p.IsActive }
+            ? new Property { Id = p.Id, Name = p.Name, Address = p.Address, City = p.City, State = p.State, ZipCode = p.ZipCode, ContactPhone = p.ContactPhone, ContactEmail = p.ContactEmail, IsActive = p.IsActive, ImagePath = p.ImagePath }
             : new Property();
+        pendingImage = null;
+        imageErr = string.Empty;
         propErr = string.Empty;
         showPropForm = true;
+    }
+
+    void HandleImageSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file.Size > 5 * 1024 * 1024) { imageErr = "Image must be under 5 MB."; return; }
+        var ext = Path.GetExtension(file.Name).ToLowerInvariant();
+        if (ext is not (".jpg" or ".jpeg" or ".png" or ".webp")) { imageErr = "Only JPG, PNG, or WebP accepted."; return; }
+        imageErr = string.Empty;
+        pendingImage = file;
     }
 
     async Task SaveProperty()
@@ -533,6 +563,18 @@
         {
             propErr = "Property name and address are required.";
             return;
+        }
+        if (pendingImage != null)
+        {
+            var ext      = Path.GetExtension(pendingImage.Name).ToLowerInvariant();
+            var fileName = $"prop_{Guid.NewGuid():N}{ext}";
+            var dir      = Path.Combine(Env.WebRootPath, "images", "properties");
+            Directory.CreateDirectory(dir);
+            var fullPath = Path.Combine(dir, fileName);
+            await using var fs = new FileStream(fullPath, FileMode.Create);
+            await pendingImage.OpenReadStream(5 * 1024 * 1024).CopyToAsync(fs);
+            editProp.ImagePath = $"/images/properties/{fileName}";
+            pendingImage = null;
         }
         bool isNew = editProp.Id == 0;
         if (isNew) await PropertyService.CreateAsync(editProp);

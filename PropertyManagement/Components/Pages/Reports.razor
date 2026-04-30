@@ -1,6 +1,8 @@
 @page "/reports"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Administrator,PropertyManager,AccountingTeam")]
 @inject IPropertyService PropertyService
+@inject IReportService ReportService
+@using PropertyManagement.Models
 
 <PageTitle>Reports - PropertyMS</PageTitle>
 
@@ -9,10 +11,11 @@
     <div class="page-hdr">
         <div>
             <h1>Reports</h1>
-            <p>Generate and export property management reports</p>
+            <p>Generate property management reports</p>
         </div>
     </div>
 
+    <!-- Filter Bar -->
     <div class="content-card panel" style="margin-bottom:20px;">
         <div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px;">
             <div class="field-row c2">
@@ -49,7 +52,7 @@
                     </div>
                 </div>
             }
-            <div style="display:flex;gap:8px;">
+            <div>
                 <button class="btn-save" @onclick="RunReport">Generate</button>
             </div>
         </div>
@@ -57,16 +60,255 @@
 
     @if (loading)
     {
-        <div style="display:flex;justify-content:center;padding:32px;">
-            <div class="spinner-border text-primary"></div>
+        <div style="display:flex;justify-content:center;padding:40px;">
+            <div class="spinner"></div>
         </div>
     }
     else if (hasRun)
     {
-        <div class="empty-state">
-            <h3>Coming soon</h3>
-            <p>Report data will appear here once the service layer is connected.</p>
-        </div>
+        <!-- Occupancy Summary -->
+        @if (selectedReport == "OccupancySummary" && occupancyRows != null)
+        {
+            <div class="stats-grid g4" style="margin-bottom:20px;">
+                <div class="stat-card">
+                    <div class="stat-label">Properties</div>
+                    <div class="stat-value">@occupancyRows.Count</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Total Units</div>
+                    <div class="stat-value">@occupancyRows.Sum(r => r.TotalUnits)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Avg Occupancy</div>
+                    <div class="stat-value">@(occupancyRows.Any() ? (int)occupancyRows.Average(r => r.OccupancyRate) : 0)%</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Actual Revenue</div>
+                    <div class="stat-value">€@occupancyRows.Sum(r => r.ActualRevenue).ToString("N0")</div>
+                    <div class="stat-sub">of €@occupancyRows.Sum(r => r.PotentialRevenue).ToString("N0") potential</div>
+                </div>
+            </div>
+            <div class="content-card">
+                <table class="report-table">
+                    <thead>
+                        <tr>
+                            <th>Property</th>
+                            <th>City</th>
+                            <th>Total</th>
+                            <th>Occupied</th>
+                            <th>Vacant</th>
+                            <th>Occupancy</th>
+                            <th>Actual Revenue</th>
+                            <th>Potential Revenue</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in occupancyRows)
+                        {
+                            <tr>
+                                <td class="fw">@r.PropertyName</td>
+                                <td>@r.PropertyCity</td>
+                                <td>@r.TotalUnits</td>
+                                <td style="color:var(--green)">@r.OccupiedUnits</td>
+                                <td style="color:var(--orange)">@r.VacantUnits</td>
+                                <td>
+                                    <div style="display:flex;align-items:center;gap:8px;">
+                                        <div class="occ-track" style="width:80px;">
+                                            <div class="occ-fill" style="width:@(r.OccupancyRate)%"></div>
+                                        </div>
+                                        <span>@r.OccupancyRate%</span>
+                                    </div>
+                                </td>
+                                <td>€@r.ActualRevenue.ToString("N0")</td>
+                                <td style="color:var(--grey)">€@r.PotentialRevenue.ToString("N0")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        <!-- Rent Roll -->
+        @if (selectedReport == "RentRoll" && rentRollRows != null)
+        {
+            <div class="stats-grid g3" style="margin-bottom:20px;">
+                <div class="stat-card">
+                    <div class="stat-label">Active Leases</div>
+                    <div class="stat-value">@rentRollRows.Count</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Monthly Rent Roll</div>
+                    <div class="stat-value">€@rentRollRows.Sum(r => r.MonthlyRent).ToString("N0")</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Expiring ≤ 60 Days</div>
+                    <div class="stat-value" style="color:var(--orange)">@rentRollRows.Count(r => r.DaysLeft is >= 0 and <= 60)</div>
+                </div>
+            </div>
+            <div class="content-card">
+                <table class="report-table">
+                    <thead>
+                        <tr>
+                            <th>Property</th>
+                            <th>Unit</th>
+                            <th>Tenant</th>
+                            <th>Monthly Rent</th>
+                            <th>Lease Start</th>
+                            <th>Lease End</th>
+                            <th>Days Left</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in rentRollRows)
+                        {
+                            <tr>
+                                <td class="fw">@r.PropertyName</td>
+                                <td>@r.UnitNumber</td>
+                                <td>@r.TenantName</td>
+                                <td>€@r.MonthlyRent.ToString("N2")</td>
+                                <td>@r.LeaseStart.ToString("dd MMM yyyy")</td>
+                                <td>@r.LeaseEnd.ToString("dd MMM yyyy")</td>
+                                <td>
+                                    @if (r.DaysLeft <= 0)
+                                    {
+                                        <span class="status-badge inactive">Expired</span>
+                                    }
+                                    else if (r.DaysLeft <= 60)
+                                    {
+                                        <span class="status-badge warning">@r.DaysLeft days</span>
+                                    }
+                                    else
+                                    {
+                                        <span>@r.DaysLeft days</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        <!-- Outstanding Payments -->
+        @if (selectedReport == "OutstandingPayments" && outstandingRows != null)
+        {
+            <div class="stats-grid g3" style="margin-bottom:20px;">
+                <div class="stat-card">
+                    <div class="stat-label">Tenants with Balance</div>
+                    <div class="stat-value" style="color:var(--red)">@outstandingRows.Count</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Total Outstanding</div>
+                    <div class="stat-value" style="color:var(--red)">€@outstandingRows.Sum(r => r.OutstandingBalance).ToString("N2")</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Avg Balance</div>
+                    <div class="stat-value">€@(outstandingRows.Any() ? outstandingRows.Average(r => r.OutstandingBalance).ToString("N2") : "0.00")</div>
+                </div>
+            </div>
+            @if (!outstandingRows.Any())
+            {
+                <div class="empty-state">
+                    <div class="empty-icon">✅</div>
+                    <h3>No outstanding balances</h3>
+                    <p>All tenants are up to date with payments.</p>
+                </div>
+            }
+            else
+            {
+                <div class="content-card">
+                    <table class="report-table">
+                        <thead>
+                            <tr>
+                                <th>Tenant</th>
+                                <th>Property</th>
+                                <th>Unit</th>
+                                <th>Monthly Rent</th>
+                                <th>Outstanding Balance</th>
+                                <th>Lease End</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var r in outstandingRows)
+                            {
+                                <tr>
+                                    <td class="fw">@r.TenantName</td>
+                                    <td>@r.PropertyName</td>
+                                    <td>@r.UnitNumber</td>
+                                    <td>€@r.MonthlyRent.ToString("N2")</td>
+                                    <td style="color:var(--red);font-weight:700;">€@r.OutstandingBalance.ToString("N2")</td>
+                                    <td>@r.LeaseEnd.ToString("dd MMM yyyy")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        }
+
+        <!-- Maintenance Log -->
+        @if (selectedReport == "MaintenanceLog" && maintenanceRows != null)
+        {
+            <div class="stats-grid g4" style="margin-bottom:20px;">
+                <div class="stat-card">
+                    <div class="stat-label">Total Requests</div>
+                    <div class="stat-value">@maintenanceRows.Count</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Open</div>
+                    <div class="stat-value" style="color:var(--orange)">@maintenanceRows.Count(r => r.Status == MaintenanceStatus.Open)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Completed</div>
+                    <div class="stat-value" style="color:var(--green)">@maintenanceRows.Count(r => r.Status == MaintenanceStatus.Completed)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Est. Total Cost</div>
+                    <div class="stat-value">€@maintenanceRows.Where(r => r.EstimatedCost.HasValue).Sum(r => r.EstimatedCost!.Value).ToString("N0")</div>
+                </div>
+            </div>
+            @if (!maintenanceRows.Any())
+            {
+                <div class="empty-state">
+                    <h3>No maintenance requests found</h3>
+                    <p>Try adjusting the date range or property filter.</p>
+                </div>
+            }
+            else
+            {
+                <div class="content-card">
+                    <table class="report-table">
+                        <thead>
+                            <tr>
+                                <th>Property</th>
+                                <th>Unit</th>
+                                <th>Title</th>
+                                <th>Urgency</th>
+                                <th>Status</th>
+                                <th>Submitted</th>
+                                <th>Completed</th>
+                                <th>Est. Cost</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var r in maintenanceRows)
+                            {
+                                <tr>
+                                    <td class="fw">@r.PropertyName</td>
+                                    <td>@r.UnitNumber</td>
+                                    <td>@r.Title</td>
+                                    <td><span class="status-badge @UrgencyClass(r.UrgencyLevel)">@r.UrgencyLevel</span></td>
+                                    <td><span class="status-badge @StatusClass(r.Status)">@r.Status</span></td>
+                                    <td>@r.CreatedAt.ToString("dd MMM yyyy")</td>
+                                    <td>@(r.CompletionDate.HasValue ? r.CompletionDate.Value.ToString("dd MMM yyyy") : "—")</td>
+                                    <td>@(r.EstimatedCost.HasValue ? "€" + r.EstimatedCost.Value.ToString("N0") : "—")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        }
     }
 
 </div>
@@ -78,6 +320,11 @@
     DateTime? dateFrom, dateTo;
     List<Property> properties = new();
 
+    List<OccupancyRow>?          occupancyRows;
+    List<RentRollRow>?           rentRollRows;
+    List<OutstandingPaymentRow>? outstandingRows;
+    List<MaintenanceLogRow>?     maintenanceRows;
+
     protected override async Task OnInitializedAsync()
     {
         properties = await PropertyService.GetAllAsync();
@@ -86,8 +333,44 @@
     async Task RunReport()
     {
         loading = true;
-        await Task.Delay(300);
+        occupancyRows   = null;
+        rentRollRows    = null;
+        outstandingRows = null;
+        maintenanceRows = null;
+
+        switch (selectedReport)
+        {
+            case "OccupancySummary":
+                occupancyRows = await ReportService.GetOccupancySummaryAsync(selectedPropertyId);
+                break;
+            case "RentRoll":
+                rentRollRows = await ReportService.GetRentRollAsync(selectedPropertyId);
+                break;
+            case "OutstandingPayments":
+                outstandingRows = await ReportService.GetOutstandingPaymentsAsync(selectedPropertyId);
+                break;
+            case "MaintenanceLog":
+                maintenanceRows = await ReportService.GetMaintenanceLogAsync(selectedPropertyId, dateFrom, dateTo);
+                break;
+        }
+
         loading = false;
-        hasRun = true;
+        hasRun  = true;
     }
+
+    static string UrgencyClass(UrgencyLevel u) => u switch
+    {
+        UrgencyLevel.High      => "danger",
+        UrgencyLevel.Emergency => "danger",
+        UrgencyLevel.Low       => "active",
+        _                      => "warning"
+    };
+
+    static string StatusClass(MaintenanceStatus s) => s switch
+    {
+        MaintenanceStatus.Completed  => "active",
+        MaintenanceStatus.Cancelled  => "inactive",
+        MaintenanceStatus.InProgress => "warning",
+        _                            => "warning"
+    };
 }

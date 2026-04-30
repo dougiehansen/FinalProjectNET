@@ -2,6 +2,7 @@
 @attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Administrator,PropertyManager,AccountingTeam")]
 @inject IPropertyService PropertyService
 @inject IReportService ReportService
+@inject IJSRuntime JS
 @using PropertyManagement.Models
 
 <PageTitle>Reports - PropertyMS</PageTitle>
@@ -52,8 +53,22 @@
                     </div>
                 </div>
             }
-            <div>
+            <div style="display:flex;gap:8px;">
                 <button class="btn-save" @onclick="RunReport">Generate</button>
+                @if (hasRun)
+                {
+                    <button class="btn-action" @onclick="ExportExcel" disabled="@exporting">
+                        @if (exporting)
+                        {
+                            <span>Exporting…</span>
+                        }
+                        else
+                        {
+                            <svg width="14" height="14" fill="none" viewBox="0 0 14 14" style="margin-right:5px;vertical-align:middle;"><path d="M7 1v8M4 6l3 3 3-3M2 11h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            <span>Export Excel</span>
+                        }
+                    </button>
+                }
             </div>
         </div>
     </div>
@@ -314,7 +329,7 @@
 </div>
 
 @code {
-    bool loading, hasRun;
+    bool loading, hasRun, exporting;
     string selectedReport = "OccupancySummary";
     int selectedPropertyId;
     DateTime? dateFrom, dateTo;
@@ -356,6 +371,16 @@
 
         loading = false;
         hasRun  = true;
+    }
+
+    async Task ExportExcel()
+    {
+        exporting = true;
+        var bytes    = await ReportService.ExportToExcelAsync(selectedReport, selectedPropertyId, dateFrom, dateTo);
+        var base64   = Convert.ToBase64String(bytes);
+        var filename = $"{selectedReport}_{DateTime.Today:yyyyMMdd}.xlsx";
+        await JS.InvokeVoidAsync("downloadFile", filename, base64);
+        exporting = false;
     }
 
     static string UrgencyClass(UrgencyLevel u) => u switch

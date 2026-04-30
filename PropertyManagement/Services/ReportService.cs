@@ -1,3 +1,4 @@
+using ClosedXML.Excel;
 using Microsoft.EntityFrameworkCore;
 using PropertyManagement.Data;
 using PropertyManagement.Models;
@@ -124,5 +125,111 @@ public class ReportService : IReportService
             CompletionDate = m.CompletionDate,
             EstimatedCost  = m.EstimatedCost
         }).ToList();
+    }
+
+    public async Task<byte[]> ExportToExcelAsync(string reportType, int propertyId, DateTime? from, DateTime? to)
+    {
+        using var wb = new XLWorkbook();
+
+        switch (reportType)
+        {
+            case "OccupancySummary":
+            {
+                var rows = await GetOccupancySummaryAsync(propertyId);
+                var ws   = wb.AddWorksheet("Occupancy Summary");
+                string[] headers = ["Property", "City", "Total Units", "Occupied", "Vacant", "Occupancy %", "Actual Revenue (€)", "Potential Revenue (€)"];
+                WriteHeaders(ws, headers);
+                for (int i = 0; i < rows.Count; i++)
+                {
+                    var r = rows[i]; int row = i + 2;
+                    ws.Cell(row, 1).Value = r.PropertyName;
+                    ws.Cell(row, 2).Value = r.PropertyCity;
+                    ws.Cell(row, 3).Value = r.TotalUnits;
+                    ws.Cell(row, 4).Value = r.OccupiedUnits;
+                    ws.Cell(row, 5).Value = r.VacantUnits;
+                    ws.Cell(row, 6).Value = r.OccupancyRate;
+                    ws.Cell(row, 7).Value = (double)r.ActualRevenue;
+                    ws.Cell(row, 8).Value = (double)r.PotentialRevenue;
+                }
+                ws.Columns().AdjustToContents();
+                break;
+            }
+            case "RentRoll":
+            {
+                var rows = await GetRentRollAsync(propertyId);
+                var ws   = wb.AddWorksheet("Rent Roll");
+                string[] headers = ["Property", "Unit", "Tenant", "Monthly Rent (€)", "Lease Start", "Lease End", "Days Left"];
+                WriteHeaders(ws, headers);
+                for (int i = 0; i < rows.Count; i++)
+                {
+                    var r = rows[i]; int row = i + 2;
+                    ws.Cell(row, 1).Value = r.PropertyName;
+                    ws.Cell(row, 2).Value = r.UnitNumber;
+                    ws.Cell(row, 3).Value = r.TenantName;
+                    ws.Cell(row, 4).Value = (double)r.MonthlyRent;
+                    ws.Cell(row, 5).Value = r.LeaseStart.ToString("dd/MM/yyyy");
+                    ws.Cell(row, 6).Value = r.LeaseEnd.ToString("dd/MM/yyyy");
+                    ws.Cell(row, 7).Value = r.DaysLeft;
+                }
+                ws.Columns().AdjustToContents();
+                break;
+            }
+            case "OutstandingPayments":
+            {
+                var rows = await GetOutstandingPaymentsAsync(propertyId);
+                var ws   = wb.AddWorksheet("Outstanding Payments");
+                string[] headers = ["Tenant", "Property", "Unit", "Monthly Rent (€)", "Outstanding Balance (€)", "Lease End"];
+                WriteHeaders(ws, headers);
+                for (int i = 0; i < rows.Count; i++)
+                {
+                    var r = rows[i]; int row = i + 2;
+                    ws.Cell(row, 1).Value = r.TenantName;
+                    ws.Cell(row, 2).Value = r.PropertyName;
+                    ws.Cell(row, 3).Value = r.UnitNumber;
+                    ws.Cell(row, 4).Value = (double)r.MonthlyRent;
+                    ws.Cell(row, 5).Value = (double)r.OutstandingBalance;
+                    ws.Cell(row, 6).Value = r.LeaseEnd.ToString("dd/MM/yyyy");
+                }
+                ws.Columns().AdjustToContents();
+                break;
+            }
+            case "MaintenanceLog":
+            {
+                var rows = await GetMaintenanceLogAsync(propertyId, from, to);
+                var ws   = wb.AddWorksheet("Maintenance Log");
+                string[] headers = ["Property", "Unit", "Title", "Urgency", "Status", "Submitted", "Completed", "Est. Cost (€)"];
+                WriteHeaders(ws, headers);
+                for (int i = 0; i < rows.Count; i++)
+                {
+                    var r = rows[i]; int row = i + 2;
+                    ws.Cell(row, 1).Value = r.PropertyName;
+                    ws.Cell(row, 2).Value = r.UnitNumber;
+                    ws.Cell(row, 3).Value = r.Title;
+                    ws.Cell(row, 4).Value = r.UrgencyLevel.ToString();
+                    ws.Cell(row, 5).Value = r.Status.ToString();
+                    ws.Cell(row, 6).Value = r.CreatedAt.ToString("dd/MM/yyyy");
+                    ws.Cell(row, 7).Value = r.CompletionDate.HasValue ? r.CompletionDate.Value.ToString("dd/MM/yyyy") : "";
+                    ws.Cell(row, 8).Value = r.EstimatedCost.HasValue ? (double)r.EstimatedCost.Value : 0;
+                }
+                ws.Columns().AdjustToContents();
+                break;
+            }
+        }
+
+        using var ms = new MemoryStream();
+        wb.SaveAs(ms);
+        return ms.ToArray();
+    }
+
+    static void WriteHeaders(IXLWorksheet ws, string[] headers)
+    {
+        for (int i = 0; i < headers.Length; i++)
+        {
+            var cell = ws.Cell(1, i + 1);
+            cell.Value = headers[i];
+            cell.Style.Font.Bold = true;
+            cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#2563eb");
+            cell.Style.Font.FontColor = XLColor.White;
+        }
     }
 }

@@ -54,4 +54,5 @@ public interface IReportService
     Task<List<RentRollRow>>           GetRentRollAsync(int propertyId);
     Task<List<OutstandingPaymentRow>> GetOutstandingPaymentsAsync(int propertyId);
     Task<List<MaintenanceLogRow>>     GetMaintenanceLogAsync(int propertyId, DateTime? from, DateTime? to);
+    Task<byte[]>                      ExportToExcelAsync(string reportType, int propertyId, DateTime? from, DateTime? to);
 }

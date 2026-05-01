@@ -27,6 +27,11 @@ public class Lease
     [MaxLength(1000)]
     public string Notes { get; set; } = string.Empty;
 
+    public SignatureStatus SignatureStatus { get; set; } = SignatureStatus.Pending;
+    public string SigningToken { get; set; } = Guid.NewGuid().ToString("N");
+    public string? SignedByName { get; set; }
+    public DateTime? SignedAt { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public ICollection<RentPayment> RentPayments { get; set; } = new List<RentPayment>();

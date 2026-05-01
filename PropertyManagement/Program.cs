@@ -67,6 +67,8 @@ builder.Services.AddScoped<ITenantService, TenantService>();
 builder.Services.AddScoped<IMaintenanceService, MaintenanceService>();
 builder.Services.AddScoped<IRentPaymentService, RentPaymentService>();
 builder.Services.AddScoped<IReportService, ReportService>();
+builder.Services.AddScoped<IDocumentService, DocumentService>();
+builder.Services.AddHostedService<LeaseExpiryWorker>();
 
 var app = builder.Build();
 

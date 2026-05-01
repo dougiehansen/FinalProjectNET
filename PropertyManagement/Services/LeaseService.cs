@@ -89,4 +89,55 @@ public class LeaseService : ILeaseService
 
         await _db.SaveChangesAsync();
     }
+
+    /// <inheritdoc/>
+    public async Task<int> AutoExpireAsync()
+    {
+        var expired = await _db.Leases
+            .Where(l => l.Status == LeaseStatus.Active && l.EndDate < DateTime.Today)
+            .Include(l => l.Unit)
+            .ToListAsync();
+
+        foreach (var lease in expired)
+        {
+            lease.Status = LeaseStatus.Expired;
+            if (lease.Unit != null)
+                lease.Unit.IsOccupied = false;
+        }
+
+        if (expired.Count > 0)
+            await _db.SaveChangesAsync();
+
+        return expired.Count;
+    }
+
+    /// <inheritdoc/>
+    public async Task<Lease?> GetByTokenAsync(string token) =>
+        await _db.Leases
+            .Include(l => l.Tenant)
+            .Include(l => l.Unit)
+                .ThenInclude(u => u.Property)
+            .FirstOrDefaultAsync(l => l.SigningToken == token);
+
+    /// <inheritdoc/>
+    public async Task SignAsync(string token, string signedByName)
+    {
+        var lease = await _db.Leases.FirstOrDefaultAsync(l => l.SigningToken == token);
+        if (lease == null) return;
+
+        lease.SignatureStatus = SignatureStatus.Signed;
+        lease.SignedByName    = signedByName;
+        lease.SignedAt        = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+    }
+
+    /// <inheritdoc/>
+    public async Task DeclineAsync(string token)
+    {
+        var lease = await _db.Leases.FirstOrDefaultAsync(l => l.SigningToken == token);
+        if (lease == null) return;
+
+        lease.SignatureStatus = SignatureStatus.Declined;
+        await _db.SaveChangesAsync();
+    }
 }

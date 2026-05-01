@@ -7,6 +7,13 @@ public enum LeaseStatus
     Terminated
 }
 
+public enum SignatureStatus
+{
+    Pending,
+    Signed,
+    Declined
+}
+
 public enum MaintenanceStatus
 {
     Open,

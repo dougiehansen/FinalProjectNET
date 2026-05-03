@@ -4,6 +4,7 @@
 @inject ITenantService TenantService
 @inject IUnitService UnitService
 @inject IPropertyService PropertyService
+@inject IDocumentService DocumentService
 @using PropertyManagement.Models
 
 <PageTitle>Leases - PropertyMS</PageTitle>
@@ -86,6 +87,7 @@
                             <th>Start</th>
                             <th>End</th>
                             <th>Status</th>
+                            <th>Signature</th>
                             <th style="text-align:right;">Actions</th>
                         </tr>
                     </thead>
@@ -114,9 +116,14 @@
                                     }
                                 </td>
                                 <td><span class="status-badge @GetStatusClass(l.Status)">@l.Status</span></td>
+                                <td><span class="status-badge @GetSigClass(l.SignatureStatus)">@l.SignatureStatus</span></td>
                                 <td>
                                     <div class="action-btns">
                                         <button class="btn-action sm" @onclick="() => OpenEditForm(l)">Edit</button>
+                                        @if (l.Status == LeaseStatus.Active && l.SignatureStatus == SignatureStatus.Pending)
+                                        {
+                                            <button class="btn-action sm" @onclick="() => SendForSigning(l)">Send for Signing</button>
+                                        }
                                     </div>
                                 </td>
                             </tr>
@@ -334,11 +341,24 @@
     /// Maps each LeaseStatus value to the corresponding theme.css
     /// status-badge modifier class defined in theme.css.
     /// </summary>
+    async Task SendForSigning(Lease l)
+    {
+        await DocumentService.SendSigningEmailAsync(l);
+        successMsg = $"Signing email sent to {l.Tenant.Email}.";
+    }
+
     string GetStatusClass(LeaseStatus s) => s switch
     {
         LeaseStatus.Active     => "active",
         LeaseStatus.Expired    => "expired",
         LeaseStatus.Terminated => "terminated",
         _                      => "expired"
+    };
+
+    string GetSigClass(SignatureStatus s) => s switch
+    {
+        SignatureStatus.Signed   => "active",
+        SignatureStatus.Declined => "expired",
+        _                        => "warning"
     };
 }

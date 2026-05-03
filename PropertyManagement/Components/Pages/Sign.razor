@@ -1,0 +1,198 @@
+@page "/sign/{Token}"
+@layout SignLayout
+@attribute [Microsoft.AspNetCore.Authorization.AllowAnonymous]
+@inject ILeaseService LeaseService
+@inject IDocumentService DocumentService
+@using PropertyManagement.Models
+
+<PageTitle>@(lease is null ? "Lease Signing" : $"Sign Lease — {lease.Unit?.Property?.Name}") — PropertyMS</PageTitle>
+
+<div style="max-width:760px;margin:0 auto;padding:32px 16px;">
+
+    <!-- Brand header -->
+    <div style="text-align:center;margin-bottom:28px;">
+        <div style="display:inline-flex;align-items:center;gap:10px;">
+            <img src="/images/keyport-icon.svg" width="36" height="36" alt="PropertyMS" />
+            <span style="font-size:22px;font-weight:700;color:#1c1c1e;">PropertyMS</span>
+        </div>
+    </div>
+
+    @if (loading)
+    {
+        <div style="text-align:center;padding:60px;">
+            <div class="spinner-border text-primary"></div>
+        </div>
+    }
+    else if (lease is null)
+    {
+        <div style="background:#fff;border-radius:12px;padding:40px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.08);">
+            <div style="font-size:48px;margin-bottom:16px;">🔗</div>
+            <h2 style="margin:0 0 8px;color:#1c1c1e;">Invalid Signing Link</h2>
+            <p style="color:#6b7280;margin:0;">This link is invalid or has already expired. Please contact your property manager.</p>
+        </div>
+    }
+    else if (lease.SignatureStatus == SignatureStatus.Signed)
+    {
+        <div style="background:#fff;border-radius:12px;padding:40px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.08);">
+            <div style="font-size:48px;margin-bottom:16px;">✅</div>
+            <h2 style="margin:0 0 8px;color:#16a34a;">Lease Already Signed</h2>
+            <p style="color:#6b7280;margin:0 0 4px;">Signed by <strong>@lease.SignedByName</strong></p>
+            <p style="color:#6b7280;margin:0;">on @lease.SignedAt?.ToString("dd MMM yyyy 'at' HH:mm") UTC</p>
+        </div>
+    }
+    else if (lease.SignatureStatus == SignatureStatus.Declined)
+    {
+        <div style="background:#fff;border-radius:12px;padding:40px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.08);">
+            <div style="font-size:48px;margin-bottom:16px;">❌</div>
+            <h2 style="margin:0 0 8px;color:#dc2626;">Lease Declined</h2>
+            <p style="color:#6b7280;margin:0;">You have already declined this lease. Please contact your property manager if this was a mistake.</p>
+        </div>
+    }
+    else if (done)
+    {
+        <div style="background:#fff;border-radius:12px;padding:40px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.08);">
+            <div style="font-size:48px;margin-bottom:16px;">✅</div>
+            <h2 style="margin:0 0 8px;color:#16a34a;">Lease Signed Successfully</h2>
+            <p style="color:#6b7280;margin:0;">Thank you, <strong>@signedByName</strong>. Your signed lease has been recorded. You will receive a copy from your property manager.</p>
+        </div>
+    }
+    else if (declined)
+    {
+        <div style="background:#fff;border-radius:12px;padding:40px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.08);">
+            <div style="font-size:48px;margin-bottom:16px;">❌</div>
+            <h2 style="margin:0 0 8px;color:#dc2626;">Lease Declined</h2>
+            <p style="color:#6b7280;margin:0;">You have declined this lease. Your property manager has been notified.</p>
+        </div>
+    }
+    else
+    {
+        <!-- Lease summary card -->
+        <div style="background:#fff;border-radius:12px;padding:28px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:20px;">
+            <div style="background:#2563eb;padding:20px 24px;border-radius:8px;margin-bottom:24px;">
+                <h1 style="color:#fff;margin:0;font-size:20px;">Residential Lease Agreement</h1>
+                <p style="color:#bfdbfe;margin:4px 0 0;font-size:14px;">Please review the terms below and sign or decline.</p>
+            </div>
+
+            <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+                <tr style="border-bottom:1px solid #e5e7eb;">
+                    <td style="padding:10px 0;color:#6b7280;width:160px;">Tenant</td>
+                    <td style="padding:10px 0;font-weight:600;">@lease.Tenant.FullName</td>
+                </tr>
+                <tr style="border-bottom:1px solid #e5e7eb;">
+                    <td style="padding:10px 0;color:#6b7280;">Property</td>
+                    <td style="padding:10px 0;font-weight:600;">@lease.Unit.Property.Name</td>
+                </tr>
+                <tr style="border-bottom:1px solid #e5e7eb;">
+                    <td style="padding:10px 0;color:#6b7280;">Address</td>
+                    <td style="padding:10px 0;font-weight:600;">@lease.Unit.Property.Address, @lease.Unit.Property.City</td>
+                </tr>
+                <tr style="border-bottom:1px solid #e5e7eb;">
+                    <td style="padding:10px 0;color:#6b7280;">Unit</td>
+                    <td style="padding:10px 0;font-weight:600;">@lease.Unit.UnitNumber</td>
+                </tr>
+                <tr style="border-bottom:1px solid #e5e7eb;">
+                    <td style="padding:10px 0;color:#6b7280;">Lease Start</td>
+                    <td style="padding:10px 0;font-weight:600;">@lease.StartDate.ToString("dd MMM yyyy")</td>
+                </tr>
+                <tr style="border-bottom:1px solid #e5e7eb;">
+                    <td style="padding:10px 0;color:#6b7280;">Lease End</td>
+                    <td style="padding:10px 0;font-weight:600;">@lease.EndDate.ToString("dd MMM yyyy")</td>
+                </tr>
+                <tr style="border-bottom:1px solid #e5e7eb;">
+                    <td style="padding:10px 0;color:#6b7280;">Monthly Rent</td>
+                    <td style="padding:10px 0;font-weight:600;">€@lease.MonthlyRent.ToString("N2")</td>
+                </tr>
+                <tr>
+                    <td style="padding:10px 0;color:#6b7280;">Security Deposit</td>
+                    <td style="padding:10px 0;font-weight:600;">€@lease.SecurityDeposit.ToString("N2")</td>
+                </tr>
+            </table>
+
+            <h3 style="font-size:15px;margin:0 0 12px;color:#1c1c1e;">Terms and Conditions</h3>
+            <div style="font-size:14px;line-height:1.7;color:#374151;display:flex;flex-direction:column;gap:8px;">
+                <p style="margin:0;"><strong>1. Rent Payment.</strong> The tenant agrees to pay the monthly rent of €@lease.MonthlyRent.ToString("N2") on or before the 1st day of each calendar month.</p>
+                <p style="margin:0;"><strong>2. Security Deposit.</strong> A security deposit of €@lease.SecurityDeposit.ToString("N2") is held against damage beyond normal wear and tear and will be returned within 30 days of lease end.</p>
+                <p style="margin:0;"><strong>3. Property Use.</strong> The tenant shall use the property solely as a private residence and shall not sublet without written consent from the landlord.</p>
+                <p style="margin:0;"><strong>4. Maintenance.</strong> The tenant shall keep the premises in a clean and sanitary condition and report any maintenance issues promptly.</p>
+                <p style="margin:0;"><strong>5. Termination.</strong> Either party may terminate this agreement with 60 days written notice prior to the end date.</p>
+            </div>
+        </div>
+
+        <!-- Signature section -->
+        <div style="background:#fff;border-radius:12px;padding:28px;box-shadow:0 1px 4px rgba(0,0,0,.08);">
+            <h3 style="margin:0 0 16px;font-size:16px;color:#1c1c1e;">Digital Signature</h3>
+            <p style="color:#6b7280;font-size:14px;margin:0 0 16px;">By entering your full name and clicking <strong>Sign Lease</strong>, you agree to the terms above and confirm this acts as your digital signature.</p>
+
+            @if (!string.IsNullOrEmpty(errorMsg))
+            {
+                <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;padding:10px 14px;color:#dc2626;font-size:14px;margin-bottom:14px;">
+                    @errorMsg
+                </div>
+            }
+
+            <div style="margin-bottom:16px;">
+                <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px;">Full Name *</label>
+                <input style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:15px;box-sizing:border-box;"
+                       type="text"
+                       placeholder="Enter your full name exactly as it appears above"
+                       @bind="signedByName"
+                       disabled="@submitting" />
+            </div>
+
+            <div style="display:flex;gap:12px;flex-wrap:wrap;">
+                <button style="flex:1;min-width:160px;padding:12px 24px;background:#16a34a;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;opacity:@(submitting ? "0.6" : "1");"
+                        @onclick="SubmitSignature" disabled="@submitting">
+                    @(submitting ? "Signing…" : "✓ Sign Lease")
+                </button>
+                <button style="padding:12px 24px;background:#fff;color:#dc2626;border:1px solid #fca5a5;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;opacity:@(submitting ? "0.6" : "1");"
+                        @onclick="Decline" disabled="@submitting">
+                    Decline
+                </button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Token { get; set; } = string.Empty;
+
+    Lease? lease;
+    bool loading = true, submitting, done, declined;
+    string signedByName = string.Empty, errorMsg = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        lease   = await LeaseService.GetByTokenAsync(Token);
+        loading = false;
+    }
+
+    async Task SubmitSignature()
+    {
+        errorMsg = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(signedByName))
+        {
+            errorMsg = "Please enter your full name to sign.";
+            return;
+        }
+
+        submitting = true;
+        await LeaseService.SignAsync(Token, signedByName.Trim());
+
+        // Reload to get updated navigation properties for the document upload
+        lease = await LeaseService.GetByTokenAsync(Token);
+        if (lease is not null)
+            await DocumentService.UploadSignedDocumentAsync(lease);
+
+        done       = true;
+        submitting = false;
+    }
+
+    async Task Decline()
+    {
+        submitting = true;
+        await LeaseService.DeclineAsync(Token);
+        declined   = true;
+        submitting = false;
+    }
+}

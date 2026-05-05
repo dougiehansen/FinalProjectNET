@@ -68,6 +68,7 @@ builder.Services.AddScoped<IMaintenanceService, MaintenanceService>();
 builder.Services.AddScoped<IRentPaymentService, RentPaymentService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IDocumentService, DocumentService>();
+builder.Services.AddSingleton<LeaseNotificationService>();
 builder.Services.AddHostedService<LeaseExpiryWorker>();
 
 var app = builder.Build();
@@ -146,6 +147,17 @@ app.MapGet("/api/eurostat/{**path}", async (string path, HttpRequest req, IHttpC
     {
         return Results.StatusCode(502);
     }
+}).RequireAuthorization();
+
+app.MapGet("/api/lease/{id:int}/document", async (int id, ApplicationDbContext db) =>
+{
+    var lease = await db.Leases
+        .Include(l => l.Tenant)
+        .Include(l => l.Unit).ThenInclude(u => u.Property)
+        .FirstOrDefaultAsync(l => l.Id == id);
+    if (lease is null) return Results.NotFound();
+    var html = PropertyManagement.Services.DocumentService.GenerateLeaseDocument(lease, signed: true);
+    return Results.Content(html, "text/html");
 }).RequireAuthorization();
 
 app.Run();

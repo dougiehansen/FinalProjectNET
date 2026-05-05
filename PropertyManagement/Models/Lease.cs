@@ -32,6 +32,8 @@ public class Lease
     public string? SignedByName { get; set; }
     public DateTime? SignedAt { get; set; }
 
+    public bool ManagerConfirmed { get; set; } = false;
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public ICollection<RentPayment> RentPayments { get; set; } = new List<RentPayment>();

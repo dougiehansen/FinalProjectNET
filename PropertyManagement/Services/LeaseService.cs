@@ -140,4 +140,14 @@ public class LeaseService : ILeaseService
         lease.SignatureStatus = SignatureStatus.Declined;
         await _db.SaveChangesAsync();
     }
+
+    /// <inheritdoc/>
+    public async Task ConfirmReviewAsync(int leaseId)
+    {
+        var lease = await _db.Leases.FindAsync(leaseId);
+        if (lease == null) return;
+
+        lease.ManagerConfirmed = true;
+        await _db.SaveChangesAsync();
+    }
 }

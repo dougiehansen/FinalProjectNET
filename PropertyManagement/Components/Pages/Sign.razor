@@ -3,6 +3,7 @@
 @attribute [Microsoft.AspNetCore.Authorization.AllowAnonymous]
 @inject ILeaseService LeaseService
 @inject IDocumentService DocumentService
+@inject PropertyManagement.Services.LeaseNotificationService NotificationService
 @using PropertyManagement.Models
 
 <PageTitle>@(lease is null ? "Lease Signing" : $"Sign Lease — {lease.Unit?.Property?.Name}") — PropertyMS</PageTitle>
@@ -182,7 +183,10 @@
         // Reload to get updated navigation properties for the document upload
         lease = await LeaseService.GetByTokenAsync(Token);
         if (lease is not null)
+        {
             await DocumentService.UploadSignedDocumentAsync(lease);
+            await NotificationService.NotifyLeaseSignedAsync(lease.Id);
+        }
 
         done       = true;
         submitting = false;

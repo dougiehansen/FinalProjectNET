@@ -1,0 +1,14 @@
+{
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
+  "permissions": {
+    "allow": [
+      "Bash(dotnet run *)",
+      "Bash(gh api *)",
+      "Bash(python3 -c ' *)",
+      "Bash(dotnet build *)"
+    ]
+  }
+}

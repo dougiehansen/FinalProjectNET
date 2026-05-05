@@ -48,4 +48,5 @@ public interface ILeaseService
     Task<Lease?>  GetByTokenAsync(string token);
     Task          SignAsync(string token, string signedByName);
     Task          DeclineAsync(string token);
+    Task          ConfirmReviewAsync(int leaseId);
 }

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using PropertyManagement.Models;
 
 namespace PropertyManagement.Data;
@@ -8,6 +9,23 @@ public static class DbInitializer
     public static async Task InitializeAsync(ApplicationDbContext db)
     {
         await db.Database.EnsureCreatedAsync();
+
+        // Add ManagerConfirmed column if upgrading an existing database
+        var conn = db.Database.GetDbConnection();
+        await conn.OpenAsync();
+        bool hasCol;
+        using (var cmd = conn.CreateCommand())
+        {
+            cmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Leases') WHERE name='ManagerConfirmed'";
+            hasCol = (long)(await cmd.ExecuteScalarAsync())! > 0;
+        }
+        if (!hasCol)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "ALTER TABLE Leases ADD COLUMN ManagerConfirmed INTEGER NOT NULL DEFAULT 0";
+            await cmd.ExecuteNonQueryAsync();
+        }
+        await conn.CloseAsync();
 
         if (db.Users.Any()) return;
 

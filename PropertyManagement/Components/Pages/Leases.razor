@@ -160,6 +160,10 @@
                                         {
                                             <button class="btn-action sm" @onclick="() => SendForSigning(l)">Send for Signing</button>
                                         }
+                                        @if (l.SignatureStatus == SignatureStatus.Signed)
+                                        {
+                                            <a class="btn-action sm" href="/api/lease/@l.Id/document" target="_blank">View Signed</a>
+                                        }
                                     </div>
                                 </td>
                             </tr>

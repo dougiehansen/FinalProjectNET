@@ -1,14 +1,24 @@
 namespace PropertyManagement.Services;
 
+public record SigningActivity(
+    int LeaseId,
+    string TenantName,
+    string Location,
+    string? IpAddress,
+    string? UserAgent,
+    DateTime Timestamp,
+    bool IsSigned
+);
+
 public class LeaseNotificationService
 {
-    public event Func<int, Task>? OnLeaseSigned;
+    public event Func<SigningActivity, Task>? OnSigningActivity;
 
-    public async Task NotifyLeaseSignedAsync(int leaseId)
+    public async Task NotifyAsync(SigningActivity activity)
     {
-        if (OnLeaseSigned is not { } handler) return;
+        if (OnSigningActivity is not { } handler) return;
         await Task.WhenAll(handler.GetInvocationList()
-            .Cast<Func<int, Task>>()
-            .Select(h => h(leaseId)));
+            .Cast<Func<SigningActivity, Task>>()
+            .Select(h => h(activity)));
     }
 }

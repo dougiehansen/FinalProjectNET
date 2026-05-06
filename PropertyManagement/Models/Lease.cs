@@ -33,6 +33,9 @@ public class Lease
     public DateTime? SignedAt { get; set; }
 
     public bool ManagerConfirmed { get; set; } = false;
+    public DateTime? SigningPageOpenedAt { get; set; }
+    public string? TenantIpAddress { get; set; }
+    public string? TenantUserAgent { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

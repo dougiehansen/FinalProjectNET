@@ -49,4 +49,5 @@ public interface ILeaseService
     Task          SignAsync(string token, string signedByName);
     Task          DeclineAsync(string token);
     Task          ConfirmReviewAsync(int leaseId);
+    Task          RecordSigningOpenedAsync(string token, string? ipAddress, string? userAgent);
 }

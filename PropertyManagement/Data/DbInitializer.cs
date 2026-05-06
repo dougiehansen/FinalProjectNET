@@ -25,6 +25,23 @@ public static class DbInitializer
             cmd.CommandText = "ALTER TABLE Leases ADD COLUMN ManagerConfirmed INTEGER NOT NULL DEFAULT 0";
             await cmd.ExecuteNonQueryAsync();
         }
+
+        async Task AddColIfMissing(string column, string definition)
+        {
+            using var c = conn.CreateCommand();
+            c.CommandText = $"SELECT COUNT(*) FROM pragma_table_info('Leases') WHERE name='{column}'";
+            if ((long)(await c.ExecuteScalarAsync())! == 0)
+            {
+                using var a = conn.CreateCommand();
+                a.CommandText = $"ALTER TABLE Leases ADD COLUMN {column} {definition}";
+                await a.ExecuteNonQueryAsync();
+            }
+        }
+
+        await AddColIfMissing("SigningPageOpenedAt", "TEXT NULL");
+        await AddColIfMissing("TenantIpAddress",     "TEXT NULL");
+        await AddColIfMissing("TenantUserAgent",     "TEXT NULL");
+
         await conn.CloseAsync();
 
         if (db.Users.Any()) return;

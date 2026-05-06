@@ -60,6 +60,42 @@
         </div>
     }
 
+    <!-- Live signing activity feed -->
+    @if (activityFeed.Any())
+    {
+        <div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:12px;padding:20px 24px;margin-bottom:20px;">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+                <span style="font-size:18px;">🔴</span>
+                <h3 style="margin:0;color:#1d4ed8;font-size:15px;">Live Signing Activity</h3>
+            </div>
+            @foreach (var a in activityFeed)
+            {
+                <div style="display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid #bfdbfe;">
+                    <span style="font-size:18px;flex-shrink:0;">@(a.IsSigned ? "✅" : "👁️")</span>
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-weight:600;color:#1c1c1e;font-size:14px;">
+                            @a.TenantName — @(a.IsSigned ? "Signed the lease" : "Opened the signing link")
+                        </div>
+                        <div style="font-size:12px;color:#6b7280;">@a.Location</div>
+                        <div style="font-size:12px;color:#6b7280;margin-top:2px;">
+                            🕐 @a.Timestamp.ToString("dd MMM yyyy HH:mm:ss") UTC
+                            @if (!string.IsNullOrEmpty(a.IpAddress))
+                            {
+                                <span>&nbsp;·&nbsp;🌐 @a.IpAddress</span>
+                            }
+                        </div>
+                        @if (!string.IsNullOrEmpty(a.UserAgent))
+                        {
+                            <div style="font-size:11px;color:#9ca3af;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="@a.UserAgent">
+                                🖥️ @(a.UserAgent.Length > 80 ? a.UserAgent[..80] + "…" : a.UserAgent)
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
     <!-- Signed leases awaiting manager review -->
     @if (leases.Any(l => l.SignatureStatus == SignatureStatus.Signed && !l.ManagerConfirmed))
     {
@@ -293,17 +329,21 @@
     int selectedPropertyId;
     string successMsg = string.Empty, formError = string.Empty;
 
+    List<PropertyManagement.Services.SigningActivity> activityFeed = new();
+
     protected override async Task OnInitializedAsync()
     {
-        NotificationService.OnLeaseSigned += OnLeaseSignedAsync;
+        NotificationService.OnSigningActivity += OnSigningActivityAsync;
         await LoadLeases();
         allTenants    = await TenantService.GetAllAsync();
         allProperties = await PropertyService.GetAllAsync();
         loading       = false;
     }
 
-    async Task OnLeaseSignedAsync(int leaseId)
+    async Task OnSigningActivityAsync(PropertyManagement.Services.SigningActivity activity)
     {
+        activityFeed.Insert(0, activity);
+        if (activityFeed.Count > 20) activityFeed.RemoveAt(20);
         await LoadLeases();
         await InvokeAsync(StateHasChanged);
     }
@@ -315,7 +355,7 @@
         successMsg = $"Lease for {l.Tenant.FullName} confirmed.";
     }
 
-    public void Dispose() => NotificationService.OnLeaseSigned -= OnLeaseSignedAsync;
+    public void Dispose() => NotificationService.OnSigningActivity -= OnSigningActivityAsync;
 
     async Task LoadLeases() => leases = await LeaseService.GetAllAsync();
 

@@ -4,6 +4,7 @@
 @inject ILeaseService LeaseService
 @inject IDocumentService DocumentService
 @inject PropertyManagement.Services.LeaseNotificationService NotificationService
+@inject IHttpContextAccessor HttpContextAccessor
 @using PropertyManagement.Models
 
 <PageTitle>@(lease is null ? "Lease Signing" : $"Sign Lease — {lease.Unit?.Property?.Name}") — PropertyMS</PageTitle>
@@ -163,8 +164,24 @@
 
     protected override async Task OnInitializedAsync()
     {
-        lease   = await LeaseService.GetByTokenAsync(Token);
+        lease = await LeaseService.GetByTokenAsync(Token);
         loading = false;
+
+        if (lease is { SignatureStatus: SignatureStatus.Pending })
+        {
+            var ctx       = HttpContextAccessor.HttpContext;
+            var ip        = ctx?.Connection.RemoteIpAddress?.ToString();
+            var userAgent = ctx?.Request.Headers.UserAgent.ToString();
+
+            await LeaseService.RecordSigningOpenedAsync(Token, ip, userAgent);
+            await NotificationService.NotifyAsync(new(
+                lease.Id,
+                lease.Tenant.FullName,
+                $"{lease.Unit.Property.Name} — Unit {lease.Unit.UnitNumber}",
+                ip, userAgent,
+                DateTime.UtcNow,
+                IsSigned: false));
+        }
     }
 
     async Task SubmitSignature()
@@ -185,7 +202,14 @@
         if (lease is not null)
         {
             await DocumentService.UploadSignedDocumentAsync(lease);
-            await NotificationService.NotifyLeaseSignedAsync(lease.Id);
+            await NotificationService.NotifyAsync(new(
+                lease.Id,
+                lease.Tenant.FullName,
+                $"{lease.Unit.Property.Name} — Unit {lease.Unit.UnitNumber}",
+                lease.TenantIpAddress,
+                lease.TenantUserAgent,
+                DateTime.UtcNow,
+                IsSigned: true));
         }
 
         done       = true;

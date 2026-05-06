@@ -142,6 +142,17 @@ public class LeaseService : ILeaseService
     }
 
     /// <inheritdoc/>
+    public async Task RecordSigningOpenedAsync(string token, string? ipAddress, string? userAgent)
+    {
+        var lease = await _db.Leases.FirstOrDefaultAsync(l => l.SigningToken == token);
+        if (lease is null || lease.SignatureStatus != SignatureStatus.Pending) return;
+        lease.SigningPageOpenedAt = DateTime.UtcNow;
+        lease.TenantIpAddress    = ipAddress;
+        lease.TenantUserAgent    = userAgent;
+        await _db.SaveChangesAsync();
+    }
+
+    /// <inheritdoc/>
     public async Task ConfirmReviewAsync(int leaseId)
     {
         var lease = await _db.Leases.FindAsync(leaseId);

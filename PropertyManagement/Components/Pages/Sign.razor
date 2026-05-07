@@ -174,7 +174,7 @@
             var userAgent = ctx?.Request.Headers.UserAgent.ToString();
 
             await LeaseService.RecordSigningOpenedAsync(Token, ip, userAgent);
-            await NotificationService.NotifyAsync(new(
+            _ = NotificationService.NotifyAsync(new(
                 lease.Id,
                 lease.Tenant.FullName,
                 $"{lease.Unit.Property.Name} — Unit {lease.Unit.UnitNumber}",
@@ -201,8 +201,9 @@
         lease = await LeaseService.GetByTokenAsync(Token);
         if (lease is not null)
         {
-            await DocumentService.UploadSignedDocumentAsync(lease);
-            await NotificationService.NotifyAsync(new(
+            try { await DocumentService.UploadSignedDocumentAsync(lease); } catch { }
+
+            _ = NotificationService.NotifyAsync(new(
                 lease.Id,
                 lease.Tenant.FullName,
                 $"{lease.Unit.Property.Name} — Unit {lease.Unit.UnitNumber}",

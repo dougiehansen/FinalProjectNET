@@ -16,9 +16,14 @@ public class LeaseNotificationService
 
     public async Task NotifyAsync(SigningActivity activity)
     {
+        var count = OnSigningActivity?.GetInvocationList().Length ?? 0;
+        Console.WriteLine($"[NOTIFY] LeaseId={activity.LeaseId} IsSigned={activity.IsSigned} Subscribers={count}");
+
         if (OnSigningActivity is not { } handler) return;
         await Task.WhenAll(handler.GetInvocationList()
             .Cast<Func<SigningActivity, Task>>()
             .Select(h => h(activity)));
+
+        Console.WriteLine($"[NOTIFY] Done LeaseId={activity.LeaseId}");
     }
 }

@@ -60,42 +60,6 @@
         </div>
     }
 
-    <!-- Live signing activity feed -->
-    @if (activityFeed.Any())
-    {
-        <div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:12px;padding:20px 24px;margin-bottom:20px;">
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
-                <span style="font-size:18px;">🔴</span>
-                <h3 style="margin:0;color:#1d4ed8;font-size:15px;">Live Signing Activity</h3>
-            </div>
-            @foreach (var a in activityFeed)
-            {
-                <div style="display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid #bfdbfe;">
-                    <span style="font-size:18px;flex-shrink:0;">@(a.IsSigned ? "✅" : "👁️")</span>
-                    <div style="flex:1;min-width:0;">
-                        <div style="font-weight:600;color:#1c1c1e;font-size:14px;">
-                            @a.TenantName — @(a.IsSigned ? "Signed the lease" : "Opened the signing link")
-                        </div>
-                        <div style="font-size:12px;color:#6b7280;">@a.Location</div>
-                        <div style="font-size:12px;color:#6b7280;margin-top:2px;">
-                            🕐 @a.Timestamp.ToString("dd MMM yyyy HH:mm:ss") UTC
-                            @if (!string.IsNullOrEmpty(a.IpAddress))
-                            {
-                                <span>&nbsp;·&nbsp;🌐 @a.IpAddress</span>
-                            }
-                        </div>
-                        @if (!string.IsNullOrEmpty(a.UserAgent))
-                        {
-                            <div style="font-size:11px;color:#9ca3af;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="@a.UserAgent">
-                                🖥️ @(a.UserAgent.Length > 80 ? a.UserAgent[..80] + "…" : a.UserAgent)
-                            </div>
-                        }
-                    </div>
-                </div>
-            }
-        </div>
-    }
-
     <!-- Signed leases awaiting manager review -->
     @if (leases.Any(l => l.SignatureStatus == SignatureStatus.Signed && !l.ManagerConfirmed))
     {
@@ -114,6 +78,22 @@
                         <div style="font-weight:700;color:#1c1c1e;">@l.Tenant.FullName</div>
                         <div style="font-size:13px;color:#6b7280;">@l.Unit.Property.Name — Unit @l.Unit.UnitNumber</div>
                         <div style="font-size:13px;color:#6b7280;">Signed by <strong>@l.SignedByName</strong> on @l.SignedAt?.ToString("dd MMM yyyy 'at' HH:mm") UTC</div>
+                        @if (l.SigningPageOpenedAt.HasValue)
+                        {
+                            <div style="font-size:12px;color:#9ca3af;margin-top:4px;">
+                                👁️ Link opened @l.SigningPageOpenedAt.Value.ToString("dd MMM yyyy 'at' HH:mm") UTC
+                                @if (!string.IsNullOrEmpty(l.TenantIpAddress))
+                                {
+                                    <span>&nbsp;·&nbsp;🌐 @l.TenantIpAddress</span>
+                                }
+                            </div>
+                        }
+                        @if (!string.IsNullOrEmpty(l.TenantUserAgent))
+                        {
+                            <div style="font-size:11px;color:#9ca3af;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="@l.TenantUserAgent">
+                                🖥️ @(l.TenantUserAgent.Length > 80 ? l.TenantUserAgent[..80] + "…" : l.TenantUserAgent)
+                            </div>
+                        }
                     </div>
                     <div style="display:flex;gap:8px;flex-shrink:0;">
                         <a href="/api/lease/@l.Id/document" target="_blank"
@@ -167,7 +147,7 @@
                         @foreach (var l in leases)
                         {
                             <!-- Rows expiring within 60 days are highlighted in orange -->
-                            <tr style="@(l.IsExpiringSoon ? "background:var(--orange-lt);" : "")">
+                            <tr style="@(recentlyUpdated.Contains(l.Id) ? "background:#f0fdf4;transition:background 1s;" : l.IsExpiringSoon ? "background:var(--orange-lt);" : "")">
                                 <td>
                                     <div class="user-cell">
                                         <div class="user-initials">@l.Tenant.FirstName[0]@l.Tenant.LastName[0]</div>
@@ -188,7 +168,12 @@
                                     }
                                 </td>
                                 <td><span class="status-badge @GetStatusClass(l.Status)">@l.Status</span></td>
-                                <td><span class="status-badge @GetSigClass(l.SignatureStatus)">@l.SignatureStatus</span></td>
+                                <td>
+                                    <span class="status-badge @GetSigClass(l.SignatureStatus)"
+                                          title="@(l.SignatureStatus == SignatureStatus.Pending && l.SigningPageOpenedAt.HasValue ? $"Opened at {l.SigningPageOpenedAt.Value:HH:mm:ss} UTC" : "")">
+                                        @(l.SignatureStatus == SignatureStatus.Pending && l.SigningPageOpenedAt.HasValue ? "Link Opened" : l.SignatureStatus)
+                                    </span>
+                                </td>
                                 <td>
                                     <div class="action-btns">
                                         <button class="btn-action sm" @onclick="() => OpenEditForm(l)">Edit</button>
@@ -329,23 +314,70 @@
     int selectedPropertyId;
     string successMsg = string.Empty, formError = string.Empty;
 
-    List<PropertyManagement.Services.SigningActivity> activityFeed = new();
+    HashSet<int> recentlyUpdated = new();
+    bool _reloadNeeded;
+    PeriodicTimer? _timer;
 
     protected override async Task OnInitializedAsync()
     {
-        NotificationService.OnSigningActivity += OnSigningActivityAsync;
+        NotificationService.OnSigningActivity += OnActivityReceived;
         await LoadLeases();
         allTenants    = await TenantService.GetAllAsync();
         allProperties = await PropertyService.GetAllAsync();
         loading       = false;
+        _ = StartPolling();
     }
 
-    async Task OnSigningActivityAsync(PropertyManagement.Services.SigningActivity activity)
+    // Called from Sign.razor's circuit — only sets a flag, no DB work here
+    Task OnActivityReceived(PropertyManagement.Services.SigningActivity activity)
     {
-        activityFeed.Insert(0, activity);
-        if (activityFeed.Count > 20) activityFeed.RemoveAt(20);
+        Console.WriteLine($"[LEASES] OnActivityReceived LeaseId={activity.LeaseId} IsSigned={activity.IsSigned}");
+        recentlyUpdated.Add(activity.LeaseId);
+        _reloadNeeded = true;
+        _ = ClearHighlightsAsync(new List<int> { activity.LeaseId });
+        return InvokeAsync(StateHasChanged);
+    }
+
+    // Runs on a background thread — only signals, never touches DB
+    async Task StartPolling()
+    {
+        Console.WriteLine("[LEASES] Polling started");
+        _timer = new PeriodicTimer(TimeSpan.FromSeconds(5));
+        while (await _timer.WaitForNextTickAsync())
+        {
+            Console.WriteLine("[LEASES] Poll tick");
+            _reloadNeeded = true;
+            try { await InvokeAsync(StateHasChanged); } catch { Console.WriteLine("[LEASES] Poll InvokeAsync failed — stopping"); break; }
+        }
+    }
+
+    // Runs on the component's own circuit — safe to access DB here
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_reloadNeeded) return;
+        Console.WriteLine("[LEASES] OnAfterRenderAsync reloading leases");
+        _reloadNeeded = false;
+
+        var prevStatuses = leases.ToDictionary(l => l.Id, l => l.SignatureStatus);
         await LoadLeases();
-        await InvokeAsync(StateHasChanged);
+        Console.WriteLine($"[LEASES] Loaded {leases.Count} leases");
+        foreach (var l in leases)
+        {
+            if (prevStatuses.TryGetValue(l.Id, out var prev) && prev != l.SignatureStatus)
+            {
+                Console.WriteLine($"[LEASES] Status changed LeaseId={l.Id} {prev} -> {l.SignatureStatus}");
+                recentlyUpdated.Add(l.Id);
+            }
+        }
+        StateHasChanged();
+        _ = ClearHighlightsAsync(recentlyUpdated.ToList());
+    }
+
+    async Task ClearHighlightsAsync(List<int> ids)
+    {
+        await Task.Delay(5000);
+        foreach (var id in ids) recentlyUpdated.Remove(id);
+        try { await InvokeAsync(StateHasChanged); } catch { }
     }
 
     async Task ConfirmReview(Lease l)
@@ -355,7 +387,11 @@
         successMsg = $"Lease for {l.Tenant.FullName} confirmed.";
     }
 
-    public void Dispose() => NotificationService.OnSigningActivity -= OnSigningActivityAsync;
+    public void Dispose()
+    {
+        NotificationService.OnSigningActivity -= OnActivityReceived;
+        _timer?.Dispose();
+    }
 
     async Task LoadLeases() => leases = await LeaseService.GetAllAsync();
 

@@ -18,6 +18,7 @@ public class LeaseService : ILeaseService
     /// <inheritdoc/>
     public async Task<List<Lease>> GetAllAsync() =>
         await _db.Leases
+            .AsNoTracking()
             .Include(l => l.Tenant)
             .Include(l => l.Unit)
                 .ThenInclude(u => u.Property)

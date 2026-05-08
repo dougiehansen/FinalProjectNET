@@ -28,20 +28,164 @@
         </div>
     }
 
-    <div class="card border-0 shadow-sm">
-        <div class="card-body p-0">
-            @if (loading)
+    <!-- Active lease balances summary -->
+    @if (!loading)
+    {
+        <div class="content-card panel" style="margin-bottom:20px;">
+            <div style="padding:16px 20px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;gap:8px;">
+                <span style="font-weight:700;font-size:15px;color:#1c1c1e;">Active Lease Balances</span>
+                @if (activeLeases.Any(l => leaseBalances.GetValueOrDefault(l.Id) > 0))
+                {
+                    <span style="background:#dc2626;color:#fff;border-radius:999px;padding:2px 9px;font-size:12px;font-weight:700;">
+                        @activeLeases.Count(l => leaseBalances.GetValueOrDefault(l.Id) > 0) overdue
+                    </span>
+                }
+            </div>
+            @if (!activeLeases.Any())
             {
-                <div class="d-flex justify-content-center py-4"><div class="spinner-border text-primary"></div></div>
-            }
-            else if (!payments.Any())
-            {
-                <p class="text-muted p-4 mb-0">No payments recorded yet.</p>
+                <p style="color:#6b7280;padding:16px 20px;margin:0;">No active leases.</p>
             }
             else
             {
-                <table class="table mb-0">
-                    <thead class="table-light">
+                <div class="table-scroll">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Tenant</th>
+                                <th>Property</th>
+                                <th>Unit</th>
+                                <th>Monthly Rent</th>
+                                <th>Due Date</th>
+                                <th>Outstanding</th>
+                                <th style="text-align:right;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var l in activeLeases)
+                            {
+                                var balance = leaseBalances.GetValueOrDefault(l.Id);
+                                var due = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+                                var isOverdue = balance > 0 && DateTime.Today > due;
+                                <tr style="@(balance > 0 ? "background:#fef2f2;" : "")">
+                                    <td>
+                                        <div class="user-cell">
+                                            <div class="user-initials">@l.Tenant.FirstName[0]@l.Tenant.LastName[0]</div>
+                                            <strong>@l.Tenant.FullName</strong>
+                                        </div>
+                                    </td>
+                                    <td>@l.Unit.Property.Name</td>
+                                    <td>@l.Unit.UnitNumber</td>
+                                    <td>€@l.MonthlyRent.ToString("N2")</td>
+                                    <td>
+                                        @due.ToString("1 MMM yyyy")
+                                        @if (isOverdue)
+                                        {
+                                            <span class="status-badge expired" style="margin-left:6px;font-size:0.72rem;">Overdue</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (balance > 0)
+                                        {
+                                            <span class="status-badge expired">€@balance.ToString("N2")</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="status-badge active">Paid up</span>
+                                        }
+                                    </td>
+                                    <td style="text-align:right;">
+                                        <button class="btn-action sm" @onclick="() => OpenFormForLease(l)">Record Payment</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    }
+
+    <!-- Future payment schedule -->
+    @if (!loading)
+    {
+        var schedule = GenerateSchedule();
+        var years = schedule.Select(p => p.DueDate.Year).Distinct().OrderBy(y => y).ToList();
+        var filtered = schedule.Where(p => p.DueDate.Year == scheduleYear).ToList();
+
+        <div class="content-card panel" style="margin-bottom:20px;">
+            <div style="padding:16px 20px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                <span style="font-weight:700;font-size:15px;color:#1c1c1e;">Payment Schedule</span>
+                <select style="padding:4px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;"
+                        value="@scheduleYear" @onchange="e => scheduleYear = int.Parse(e.Value!.ToString()!)">
+                    @foreach (var y in years)
+                    {
+                        <option value="@y">@y</option>
+                    }
+                </select>
+                <span style="color:#6b7280;font-size:13px;">@filtered.Count payments · €@filtered.Sum(p => p.Lease.MonthlyRent).ToString("N2") total</span>
+            </div>
+            @if (!filtered.Any())
+            {
+                <p style="color:#6b7280;padding:16px 20px;margin:0;">No scheduled payments for this year.</p>
+            }
+            else
+            {
+                <div class="table-scroll">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Due Date</th>
+                                <th>Tenant</th>
+                                <th>Property</th>
+                                <th>Unit</th>
+                                <th>Amount</th>
+                                <th style="text-align:right;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var p in filtered)
+                            {
+                                <tr>
+                                    <td>@p.DueDate.ToString("1 MMM yyyy")</td>
+                                    <td>
+                                        <div class="user-cell">
+                                            <div class="user-initials">@p.Lease.Tenant.FirstName[0]@p.Lease.Tenant.LastName[0]</div>
+                                            <strong>@p.Lease.Tenant.FullName</strong>
+                                        </div>
+                                    </td>
+                                    <td>@p.Lease.Unit.Property.Name</td>
+                                    <td>@p.Lease.Unit.UnitNumber</td>
+                                    <td style="font-weight:600;">€@p.Lease.MonthlyRent.ToString("N2")</td>
+                                    <td style="text-align:right;">
+                                        <button class="btn-action sm" @onclick="() => OpenFormForLease(p.Lease, p.DueDate)">Record Payment</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    }
+
+    <!-- Payment history -->
+    <div class="content-card panel">
+        <div style="padding:16px 20px;border-bottom:1px solid #e5e7eb;">
+            <span style="font-weight:700;font-size:15px;color:#1c1c1e;">Payment History</span>
+        </div>
+        @if (loading)
+        {
+            <div class="d-flex justify-content-center py-4"><div class="spinner-border text-primary"></div></div>
+        }
+        else if (!payments.Any())
+        {
+            <p style="color:#6b7280;padding:16px 20px;margin:0;">No payments recorded yet.</p>
+        }
+        else
+        {
+            <div class="table-scroll">
+                <table class="data-table">
+                    <thead>
                         <tr>
                             <th>Tenant</th><th>Property</th><th>Unit</th><th>Amount</th>
                             <th>Date</th><th>Method</th><th>Outstanding</th><th>Notes</th>
@@ -54,26 +198,26 @@
                                 <td>@p.Lease.Tenant.FullName</td>
                                 <td>@p.Lease.Unit.Property.Name</td>
                                 <td>@p.Lease.Unit.UnitNumber</td>
-                                <td class="text-success fw-semibold">&#8364;@p.Amount.ToString("N2")</td>
+                                <td style="color:#16a34a;font-weight:600;">€@p.Amount.ToString("N2")</td>
                                 <td>@p.PaymentDate.ToString("dd MMM yyyy")</td>
                                 <td>@p.PaymentMethod</td>
                                 <td>
                                     @if (p.OutstandingBalance > 0)
                                     {
-                                        <span class="badge bg-danger">&#8364;@p.OutstandingBalance.ToString("N2")</span>
+                                        <span class="status-badge expired">€@p.OutstandingBalance.ToString("N2")</span>
                                     }
                                     else
                                     {
-                                        <span class="badge bg-success">Paid</span>
+                                        <span class="status-badge active">Paid</span>
                                     }
                                 </td>
-                                <td class="text-muted small">@p.Notes</td>
+                                <td style="color:#6b7280;font-size:13px;">@p.Notes</td>
                             </tr>
                         }
                     </tbody>
                 </table>
-            }
-        </div>
+            </div>
+        }
     </div>
 
 </div>
@@ -148,14 +292,34 @@
 }
 
 @code {
+    record ScheduledPayment(DateTime DueDate, Lease Lease);
+
     bool loading = true, showForm;
     List<RentPayment> payments = new();
     List<Lease> activeLeases = new();
+    Dictionary<int, decimal> leaseBalances = new();
     RentPayment editing = new();
     Lease? selectedLease;
     decimal currentBalance;
     string successMsg = string.Empty, formError = string.Empty;
     int currentUserId;
+    int scheduleYear = DateTime.Today.Year;
+
+    List<ScheduledPayment> GenerateSchedule()
+    {
+        var result = new List<ScheduledPayment>();
+        var startFrom = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+        foreach (var l in activeLeases)
+        {
+            var date = startFrom;
+            while (date <= l.EndDate)
+            {
+                result.Add(new(date, l));
+                date = date.AddMonths(1);
+            }
+        }
+        return result.OrderBy(p => p.DueDate).ThenBy(p => p.Lease.Tenant.FullName).ToList();
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -165,7 +329,15 @@
         payments = await RentPaymentService.GetAllAsync();
         var allLeases = await LeaseService.GetAllAsync();
         activeLeases = allLeases.Where(l => l.Status == LeaseStatus.Active).ToList();
+        await LoadBalances();
         loading = false;
+    }
+
+    async Task LoadBalances()
+    {
+        leaseBalances = new();
+        foreach (var l in activeLeases)
+            leaseBalances[l.Id] = await LeaseService.GetOutstandingBalanceAsync(l.Id);
     }
 
     void OpenForm()
@@ -173,6 +345,18 @@
         editing = new RentPayment { PaymentDate = DateTime.Today, PaymentMethod = PaymentMethod.BankTransfer };
         selectedLease = null;
         currentBalance = 0;
+        formError = string.Empty;
+        showForm = true;
+    }
+
+    void OpenFormForLease(Lease l, DateTime? dueDate = null)
+    {
+        var date = dueDate ?? DateTime.Today;
+        var isPrepayment = date > DateTime.Today;
+        editing = new RentPayment { LeaseId = l.Id, PaymentDate = date, PaymentMethod = PaymentMethod.BankTransfer, Amount = l.MonthlyRent,
+            Notes = isPrepayment ? $"Prepayment for {date:MMMM yyyy}" : string.Empty };
+        selectedLease = l;
+        currentBalance = leaseBalances.GetValueOrDefault(l.Id);
         formError = string.Empty;
         showForm = true;
     }
@@ -200,11 +384,6 @@
             formError = "Payment amount must be greater than zero.";
             return;
         }
-        if (editing.PaymentDate > DateTime.Today)
-        {
-            formError = "Payment date cannot be in the future. Please confirm the date.";
-            return;
-        }
 
         editing.RecordedByUserId = currentUserId;
         await RentPaymentService.RecordPaymentAsync(editing);
@@ -212,5 +391,6 @@
         showForm = false;
         successMsg = "Payment recorded successfully.";
         payments = await RentPaymentService.GetAllAsync();
+        await LoadBalances();
     }
 }

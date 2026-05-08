@@ -132,6 +132,7 @@
                 <table class="data-table">
                     <thead>
                         <tr>
+                            <th>#</th>
                             <th>Tenant</th>
                             <th>Property</th>
                             <th>Unit</th>
@@ -148,6 +149,7 @@
                         {
                             <!-- Rows expiring within 60 days are highlighted in orange -->
                             <tr style="@(recentlyUpdated.Contains(l.Id) ? "background:#f0fdf4;transition:background 1s;" : l.IsExpiringSoon ? "background:var(--orange-lt);" : "")">
+                                <td style="color:#6b7280;font-size:13px;">@l.Id</td>
                                 <td>
                                     <div class="user-cell">
                                         <div class="user-initials">@l.Tenant.FirstName[0]@l.Tenant.LastName[0]</div>

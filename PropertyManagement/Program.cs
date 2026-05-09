@@ -67,6 +67,7 @@ builder.Services.AddScoped<ITenantService, TenantService>();
 builder.Services.AddScoped<IRentPaymentService, RentPaymentService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IDocumentService, DocumentService>();
+builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddSingleton<LeaseNotificationService>();
 builder.Services.AddHostedService<LeaseExpiryWorker>();
 

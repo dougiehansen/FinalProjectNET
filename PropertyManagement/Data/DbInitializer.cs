@@ -42,6 +42,20 @@ public static class DbInitializer
         await AddColIfMissing("TenantIpAddress",     "TEXT NULL");
         await AddColIfMissing("TenantUserAgent",     "TEXT NULL");
 
+        using (var cmd = conn.CreateCommand())
+        {
+            cmd.CommandText = @"CREATE TABLE IF NOT EXISTS AuditLogs (
+                Id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                Action      TEXT NOT NULL,
+                TargetName  TEXT NOT NULL,
+                TargetEmail TEXT NOT NULL,
+                Details     TEXT NULL,
+                PerformedBy TEXT NOT NULL,
+                CreatedAt   TEXT NOT NULL
+            )";
+            await cmd.ExecuteNonQueryAsync();
+        }
+
         await conn.CloseAsync();
 
         if (db.Users.Any()) return;

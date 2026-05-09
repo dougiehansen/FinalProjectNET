@@ -1,6 +1,9 @@
 @page "/admin/users"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Administrator")]
 @inject IUserService UserService
+@inject IAuditLogService AuditService
+@inject AuthenticationStateProvider AuthStateProvider
+@using PropertyManagement.Models
 
 <PageTitle>User Management - PropertyMS</PageTitle>
 
@@ -22,7 +25,7 @@
         </div>
     }
 
-    <section class="stats-grid g3">
+    <section class="stats-grid g4">
         <div class="stat-card">
             <div class="stat-label">Total Users</div>
             <div class="stat-value">@users.Count</div>
@@ -37,6 +40,11 @@
             <div class="stat-label">Administrators</div>
             <div class="stat-value">@users.Count(u => u.Role == UserRole.Administrator)</div>
             <div class="stat-sub">Users with elevated access</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Events Today</div>
+            <div class="stat-value">@auditLogs.Count(a => a.CreatedAt.Date == DateTime.UtcNow.Date)</div>
+            <div class="stat-sub">Admin actions logged</div>
         </div>
     </section>
 
@@ -107,11 +115,11 @@
                                         <button class="btn-action sm" @onclick="() => OpenEditForm(u)">Edit</button>
                                         @if (u.IsActive)
                                         {
-                                            <button class="btn-action sm danger" @onclick="() => Deactivate(u.Id)">Disable</button>
+                                            <button class="btn-action sm danger" @onclick="() => Deactivate(u)">Disable</button>
                                         }
                                         else
                                         {
-                                            <button class="btn-action sm primary" @onclick="() => Activate(u.Id)">Activate</button>
+                                            <button class="btn-action sm primary" @onclick="() => Activate(u)">Activate</button>
                                         }
                                     </div>
                                 </td>
@@ -122,6 +130,72 @@
             }
         </div>
     </section>
+
+    <!-- Activity Feed -->
+    <section class="content-card panel" style="margin-top:20px;">
+        <div style="padding:16px 20px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;"
+             @onclick="() => showFeed = !showFeed">
+            <div style="display:flex;align-items:center;gap:10px;">
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="color:#64748b;">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                </svg>
+                <span style="font-weight:700;font-size:0.95rem;color:#1c1c1e;">Activity Log</span>
+                @if (auditLogs.Any())
+                {
+                    <span style="background:#2563eb;color:#fff;border-radius:999px;padding:1px 9px;font-size:0.72rem;font-weight:700;">@auditLogs.Count</span>
+                }
+            </div>
+            <span style="color:var(--grey);font-size:0.78rem;font-weight:500;">
+                @(showFeed ? "▲ Hide" : "▼ Show")
+            </span>
+        </div>
+
+        @if (showFeed)
+        {
+            <div style="border-top:1px solid var(--border);">
+                @if (!auditLogs.Any())
+                {
+                    <div class="empty-state" style="padding:32px 20px;">
+                        <div class="empty-icon">📋</div>
+                        <h3>No activity yet</h3>
+                        <p>Actions will appear here as users are created, modified, or disabled.</p>
+                    </div>
+                }
+                else
+                {
+                    <div style="padding:4px 0;">
+                        @foreach (var log in auditLogs)
+                        {
+                            <div style="display:flex;align-items:flex-start;gap:14px;padding:13px 20px;border-bottom:1px solid #f8fafc;transition:background 0.15s;"
+                                 onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
+                                <!-- Coloured action dot -->
+                                <div style="width:36px;height:36px;border-radius:50%;background:@ActionBg(log.Action);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;margin-top:1px;box-shadow:0 1px 4px rgba(0,0,0,0.08);">
+                                    @ActionIcon(log.Action)
+                                </div>
+                                <div style="flex:1;min-width:0;">
+                                    <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;">
+                                        <span style="font-weight:700;font-size:0.84rem;color:@ActionTextColor(log.Action);">@log.Action</span>
+                                        <span style="font-size:0.84rem;color:#1c1c1e;font-weight:600;">@log.TargetName</span>
+                                        <span style="font-size:0.76rem;color:#94a3b8;">@log.TargetEmail</span>
+                                    </div>
+                                    @if (!string.IsNullOrEmpty(log.Details))
+                                    {
+                                        <div style="font-size:0.78rem;color:#6b7280;margin-top:2px;">@log.Details</div>
+                                    }
+                                    <div style="font-size:0.73rem;color:#94a3b8;margin-top:4px;">
+                                        By&nbsp;<strong style="color:#64748b;">@log.PerformedBy</strong>
+                                        &nbsp;·&nbsp;
+                                        <span title="@log.CreatedAt.ToString("dd MMM yyyy, HH:mm") UTC">@RelativeTime(log.CreatedAt)</span>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        }
+    </section>
+
 </div>
 
 @if (showForm)
@@ -181,12 +255,15 @@
 }
 
 @code {
-    bool loading = true, showForm;
-    List<User> users = new();
-    User editing = new();
-    string password = string.Empty;
-    string successMsg = string.Empty, formError = string.Empty;
-    string searchText = string.Empty, roleFilter = string.Empty, statusFilter = string.Empty;
+    bool loading = true, showForm, showFeed = true;
+    List<User> users         = new();
+    List<AuditLog> auditLogs = new();
+    User editing             = new();
+    string password          = string.Empty;
+    string successMsg        = string.Empty, formError = string.Empty;
+    string searchText        = string.Empty, roleFilter = string.Empty, statusFilter = string.Empty;
+    string currentUserName   = string.Empty;
+    UserRole originalRole;
 
     IEnumerable<User> FilteredUsers => users.Where(u =>
         (string.IsNullOrEmpty(searchText) || u.FullName.Contains(searchText, StringComparison.OrdinalIgnoreCase) || u.Email.Contains(searchText, StringComparison.OrdinalIgnoreCase)) &&
@@ -196,16 +273,19 @@
 
     protected override async Task OnInitializedAsync()
     {
-        users = await UserService.GetAllAsync();
-        loading = false;
+        var authState     = await AuthStateProvider.GetAuthenticationStateAsync();
+        currentUserName   = authState.User.Identity?.Name ?? "Unknown";
+        users             = await UserService.GetAllAsync();
+        auditLogs         = await AuditService.GetRecentAsync();
+        loading           = false;
     }
 
     void OpenCreateForm()
     {
-        editing = new User { IsActive = true };
-        password = string.Empty;
-        formError = string.Empty;
-        showForm = true;
+        editing    = new User { IsActive = true };
+        password   = string.Empty;
+        formError  = string.Empty;
+        showForm   = true;
     }
 
     void OpenEditForm(User u)
@@ -215,9 +295,10 @@
             Id = u.Id, FirstName = u.FirstName, LastName = u.LastName,
             Email = u.Email, Role = u.Role, IsActive = u.IsActive, PasswordHash = u.PasswordHash
         };
-        password = string.Empty;
-        formError = string.Empty;
-        showForm = true;
+        originalRole = u.Role;
+        password     = string.Empty;
+        formError    = string.Empty;
+        showForm     = true;
     }
 
     async Task Save()
@@ -240,30 +321,87 @@
             return;
         }
 
-        if (editing.Id == 0)
+        bool isNew = editing.Id == 0;
+        if (isNew)
+        {
             await UserService.CreateAsync(editing, password);
+            await AuditService.LogAsync("User Created", editing.FullName, editing.Email, currentUserName, $"Role: {editing.Role}");
+        }
         else
+        {
             await UserService.UpdateAsync(editing, string.IsNullOrWhiteSpace(password) ? null : password);
 
-        showForm = false;
-        successMsg = editing.Id == 0 ? "User created successfully." : "User updated successfully.";
-        users = await UserService.GetAllAsync();
+            var details = editing.Role != originalRole
+                ? $"Role changed: {originalRole} → {editing.Role}"
+                : $"Role: {editing.Role}";
+
+            if (!string.IsNullOrWhiteSpace(password))
+                details += " · Password updated";
+
+            await AuditService.LogAsync("User Updated", editing.FullName, editing.Email, currentUserName, details);
+        }
+
+        showForm  = false;
+        successMsg = isNew ? "User created successfully." : "User updated successfully.";
+        users      = await UserService.GetAllAsync();
+        auditLogs  = await AuditService.GetRecentAsync();
     }
 
-    async Task Deactivate(int id)
+    async Task Deactivate(User u)
     {
-        await UserService.DeactivateAsync(id);
+        await UserService.DeactivateAsync(u.Id);
+        await AuditService.LogAsync("User Deactivated", u.FullName, u.Email, currentUserName);
         successMsg = "User deactivated.";
-        users = await UserService.GetAllAsync();
+        users      = await UserService.GetAllAsync();
+        auditLogs  = await AuditService.GetRecentAsync();
     }
 
-    async Task Activate(int id)
+    async Task Activate(User u)
     {
-        await UserService.ActivateAsync(id);
+        await UserService.ActivateAsync(u.Id);
+        await AuditService.LogAsync("User Activated", u.FullName, u.Email, currentUserName);
         successMsg = "User activated.";
-        users = await UserService.GetAllAsync();
+        users      = await UserService.GetAllAsync();
+        auditLogs  = await AuditService.GetRecentAsync();
     }
 
     static string Initials(User u) =>
         $"{(u.FirstName.Length > 0 ? u.FirstName[0] : ' ')}{(u.LastName.Length > 0 ? u.LastName[0] : ' ')}".ToUpper();
+
+    static string RelativeTime(DateTime utc)
+    {
+        var diff = DateTime.UtcNow - utc;
+        if (diff.TotalSeconds < 60)  return "just now";
+        if (diff.TotalMinutes < 60)  return $"{(int)diff.TotalMinutes}m ago";
+        if (diff.TotalHours   < 24)  return $"{(int)diff.TotalHours}h ago";
+        if (diff.TotalDays    < 7)   return $"{(int)diff.TotalDays}d ago";
+        return utc.ToString("dd MMM yyyy");
+    }
+
+    static string ActionIcon(string action) => action switch
+    {
+        "User Created"     => "👤",
+        "User Updated"     => "✏️",
+        "User Deactivated" => "🚫",
+        "User Activated"   => "✅",
+        _                  => "📋"
+    };
+
+    static string ActionBg(string action) => action switch
+    {
+        "User Created"     => "#dcfce7",
+        "User Updated"     => "#dbeafe",
+        "User Deactivated" => "#fee2e2",
+        "User Activated"   => "#dcfce7",
+        _                  => "#f3f4f6"
+    };
+
+    static string ActionTextColor(string action) => action switch
+    {
+        "User Created"     => "#16a34a",
+        "User Updated"     => "#2563eb",
+        "User Deactivated" => "#dc2626",
+        "User Activated"   => "#16a34a",
+        _                  => "#6b7280"
+    };
 }

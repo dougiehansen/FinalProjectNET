@@ -287,12 +287,18 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 0.2rem 0;
-            border-bottom: 1px solid #f1f5f9;
+            padding: 0.25rem 0.5rem;
+            border-bottom: 1px solid #e3ddd5;
+            border-radius: 7px;
+            cursor: pointer;
+            transition: background 0.15s;
+            gap: 0.5rem;
         }
         .demo-row:last-child { border-bottom: none; }
+        .demo-row:hover { background: #e8e2d8; }
+        .demo-row:active { background: #ddd7cc; }
         .demo-role { font-size: 0.72rem; font-weight: 600; color: #64748b; min-width: 115px; }
-        .demo-creds { font-size: 0.68rem; color: #94a3b8; font-family: 'Consolas', monospace; }
+        .demo-fill-hint { font-size: 0.65rem; color: #b0a898; margin-left: auto; }
     </style>
 </head>
 <body>
@@ -309,7 +315,7 @@
             <span class="left-brand-name">Key<span>Port</span></span>
         </div>
         <div class="left-heading">Property management,<br />done differently.</div>
-        <div class="left-sub">Tenants, leases, maintenance &amp; financials —<br />all in one intelligent platform.</div>
+        <div class="left-sub">Tenants, leases, payments &amp; financials —<br />all in one intelligent platform.</div>
     </div>
 
     <!-- Glassmorphic login card -->
@@ -382,25 +388,29 @@
         <div class="divider"><span>Demo accounts</span></div>
 
         <div class="demo-box">
-            <div class="demo-box-title">Quick access</div>
-            <div class="demo-row">
+            <div class="demo-box-title">Quick access — click to fill</div>
+            <div class="demo-row" onclick="fillDemo('admin@property.com','Admin123!')">
                 <span class="demo-role">Administrator</span>
-                <span class="demo-creds">admin@property.com / Admin123!</span>
+                <span class="demo-fill-hint">click to fill →</span>
             </div>
-            <div class="demo-row">
+            <div class="demo-row" onclick="fillDemo('manager@property.com','Manager123!')">
                 <span class="demo-role">Property Manager</span>
-                <span class="demo-creds">manager@property.com / Manager123!</span>
+                <span class="demo-fill-hint">click to fill →</span>
             </div>
-            <div class="demo-row">
-                <span class="demo-role">Maintenance</span>
-                <span class="demo-creds">maintenance@property.com / Maint123!</span>
-            </div>
-            <div class="demo-row">
+            <div class="demo-row" onclick="fillDemo('accounting@property.com','Acct123!')">
                 <span class="demo-role">Accounting</span>
-                <span class="demo-creds">accounting@property.com / Acct123!</span>
+                <span class="demo-fill-hint">click to fill →</span>
             </div>
         </div>
     </div>
+
+    <script>
+        function fillDemo(email, password) {
+            document.getElementById('Input_Email').value = email;
+            document.getElementById('Input_Password').value = password;
+            document.getElementById('Input_Email').focus();
+        }
+    </script>
 
 </body>
 </html>

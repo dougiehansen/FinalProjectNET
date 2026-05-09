@@ -53,10 +53,9 @@ public static class DbInitializer
             new User { FirstName = "Admin",       LastName = "User",    Email = "admin@property.com",       Role = UserRole.Administrator },
             new User { FirstName = "Code",        LastName = "Testing", Email = "codetestingtu@gmail.com",   Role = UserRole.Administrator },
             new User { FirstName = "Property",    LastName = "Manager", Email = "manager@property.com",     Role = UserRole.PropertyManager },
-            new User { FirstName = "Maintenance", LastName = "Staff",   Email = "maintenance@property.com", Role = UserRole.MaintenanceStaff },
             new User { FirstName = "Accounting",  LastName = "Staff",   Email = "accounting@property.com",  Role = UserRole.AccountingTeam },
         };
-        string[] passwords = { "Admin123!", "Admin123!", "Manager123!", "Maint123!", "Acct123!" };
+        string[] passwords = { "Admin123!", "Admin123!", "Manager123!", "Acct123!" };
 
         for (int i = 0; i < users.Length; i++)
             users[i].PasswordHash = hasher.HashPassword(users[i], passwords[i]);
@@ -180,50 +179,5 @@ public static class DbInitializer
         db.RentPayments.AddRange(payments);
         await db.SaveChangesAsync();
 
-        // Maintenance Requests
-        var maintenanceRequests = new[]
-        {
-            new MaintenanceRequest
-            {
-                PropertyId = properties[0].Id, UnitId = units[0].Id,
-                SubmittedByUserId = users[2].Id, AssignedToUserId = users[3].Id,
-                Title = "Leaking tap in kitchen",
-                Description = "The kitchen tap has been dripping constantly for the past week.",
-                UrgencyLevel = UrgencyLevel.Medium, Status = MaintenanceStatus.InProgress,
-                AssignmentNotes = "Plumber scheduled for next Tuesday."
-            },
-            new MaintenanceRequest
-            {
-                PropertyId = properties[0].Id, UnitId = units[1].Id,
-                SubmittedByUserId = users[2].Id,
-                Title = "Broken heating unit",
-                Description = "The heating unit in the living room is not working.",
-                UrgencyLevel = UrgencyLevel.High, Status = MaintenanceStatus.Open,
-            },
-            new MaintenanceRequest
-            {
-                PropertyId = properties[1].Id, UnitId = units[4].Id,
-                SubmittedByUserId = users[2].Id, AssignedToUserId = users[3].Id,
-                Title = "Faulty bathroom extractor fan",
-                Description = "The extractor fan in the bathroom makes a loud noise and needs replacing.",
-                UrgencyLevel = UrgencyLevel.Low, Status = MaintenanceStatus.InProgress,
-                AssignmentNotes = "Parts ordered, awaiting delivery."
-            },
-            new MaintenanceRequest
-            {
-                PropertyId = properties[2].Id, UnitId = units[7].Id,
-                SubmittedByUserId = users[2].Id, AssignedToUserId = users[3].Id,
-                Title = "Damaged front door lock",
-                Description = "The front door lock is stiff and difficult to open.",
-                UrgencyLevel = UrgencyLevel.High, Status = MaintenanceStatus.Completed,
-                CompletionDate = new DateTime(2025, 12, 10),
-                MaterialsUsed = "Yale lock replacement kit",
-                EstimatedCost = 85m,
-                CompletionNotes = "Lock replaced and tested. Tenant confirmed working."
-            },
-        };
-
-        db.MaintenanceRequests.AddRange(maintenanceRequests);
-        await db.SaveChangesAsync();
     }
 }

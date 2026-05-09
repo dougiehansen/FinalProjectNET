@@ -36,23 +36,10 @@ public class OutstandingPaymentRow
     public DateTime LeaseEnd            { get; set; }
 }
 
-public class MaintenanceLogRow
-{
-    public string            PropertyName    { get; set; } = string.Empty;
-    public string            UnitNumber      { get; set; } = string.Empty;
-    public string            Title           { get; set; } = string.Empty;
-    public UrgencyLevel      UrgencyLevel    { get; set; }
-    public MaintenanceStatus Status          { get; set; }
-    public DateTime          CreatedAt       { get; set; }
-    public DateTime?         CompletionDate  { get; set; }
-    public decimal?          EstimatedCost   { get; set; }
-}
-
 public interface IReportService
 {
     Task<List<OccupancyRow>>          GetOccupancySummaryAsync(int propertyId);
     Task<List<RentRollRow>>           GetRentRollAsync(int propertyId);
     Task<List<OutstandingPaymentRow>> GetOutstandingPaymentsAsync(int propertyId);
-    Task<List<MaintenanceLogRow>>     GetMaintenanceLogAsync(int propertyId, DateTime? from, DateTime? to);
-    Task<byte[]>                      ExportToExcelAsync(string reportType, int propertyId, DateTime? from, DateTime? to);
+    Task<byte[]>                      ExportToExcelAsync(string reportType, int propertyId);
 }

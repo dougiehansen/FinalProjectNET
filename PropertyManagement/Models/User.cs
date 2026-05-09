@@ -1,6 +1,6 @@
 namespace PropertyManagement.Models;
 
-public enum UserRole { Administrator, PropertyManager, MaintenanceStaff, AccountingTeam }
+public enum UserRole { Administrator, PropertyManager, AccountingTeam }
 
 public class User
 {

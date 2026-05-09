@@ -28,11 +28,6 @@
             <div class="stat-value">@activeLeases</div>
             <div class="stat-sub">Current tenants</div>
         </div>
-        <div class="stat-card">
-            <div class="stat-label">Open Maintenance</div>
-            <div class="stat-value">@openMaintenance</div>
-            <div class="stat-sub">Requests pending</div>
-        </div>
     </section>
 
     <div class="content-card map-card">
@@ -143,7 +138,7 @@
 }
 
 @code {
-    int totalProperties, totalUnits, occupiedUnits, activeLeases, openMaintenance;
+    int totalProperties, totalUnits, occupiedUnits, activeLeases;
     decimal portfolioAvg;
     List<PropertyMapPin> pins = new();
     PropertyMapPin? selectedPin;
@@ -155,7 +150,6 @@
         totalUnits      = await Db.Units.CountAsync(u => u.IsActive);
         occupiedUnits   = await Db.Units.CountAsync(u => u.IsActive && u.IsOccupied);
         activeLeases    = await Db.Leases.CountAsync(l => l.Status == LeaseStatus.Active);
-        openMaintenance = await Db.MaintenanceRequests.CountAsync(m => m.Status == MaintenanceStatus.Open || m.Status == MaintenanceStatus.InProgress);
         portfolioAvg    = await Db.Units.AnyAsync(u => u.IsActive)
             ? Math.Round(await Db.Units.Where(u => u.IsActive).AverageAsync(u => u.MonthlyRent), 0)
             : 0;

@@ -26,7 +26,6 @@
                         <option value="OccupancySummary">Occupancy Summary</option>
                         <option value="RentRoll">Rent Roll</option>
                         <option value="OutstandingPayments">Outstanding Payments</option>
-                        <option value="MaintenanceLog">Maintenance Log</option>
                     </select>
                 </div>
                 <div class="field-group">
@@ -40,19 +39,6 @@
                     </select>
                 </div>
             </div>
-            @if (selectedReport == "MaintenanceLog")
-            {
-                <div class="field-row c2">
-                    <div class="field-group">
-                        <label class="field-label">From</label>
-                        <input class="field-input" type="date" @bind="dateFrom" />
-                    </div>
-                    <div class="field-group">
-                        <label class="field-label">To</label>
-                        <input class="field-input" type="date" @bind="dateTo" />
-                    </div>
-                </div>
-            }
             <div style="display:flex;gap:8px;">
                 <button class="btn-save" @onclick="RunReport">Generate</button>
                 @if (hasRun)
@@ -261,69 +247,6 @@
             }
         }
 
-        <!-- Maintenance Log -->
-        @if (selectedReport == "MaintenanceLog" && maintenanceRows != null)
-        {
-            <div class="stats-grid g4" style="margin-bottom:20px;">
-                <div class="stat-card">
-                    <div class="stat-label">Total Requests</div>
-                    <div class="stat-value">@maintenanceRows.Count</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Open</div>
-                    <div class="stat-value" style="color:var(--orange)">@maintenanceRows.Count(r => r.Status == MaintenanceStatus.Open)</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Completed</div>
-                    <div class="stat-value" style="color:var(--green)">@maintenanceRows.Count(r => r.Status == MaintenanceStatus.Completed)</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Est. Total Cost</div>
-                    <div class="stat-value">€@maintenanceRows.Where(r => r.EstimatedCost.HasValue).Sum(r => r.EstimatedCost!.Value).ToString("N0")</div>
-                </div>
-            </div>
-            @if (!maintenanceRows.Any())
-            {
-                <div class="empty-state">
-                    <h3>No maintenance requests found</h3>
-                    <p>Try adjusting the date range or property filter.</p>
-                </div>
-            }
-            else
-            {
-                <div class="content-card">
-                    <table class="report-table">
-                        <thead>
-                            <tr>
-                                <th>Property</th>
-                                <th>Unit</th>
-                                <th>Title</th>
-                                <th>Urgency</th>
-                                <th>Status</th>
-                                <th>Submitted</th>
-                                <th>Completed</th>
-                                <th>Est. Cost</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var r in maintenanceRows)
-                            {
-                                <tr>
-                                    <td class="fw">@r.PropertyName</td>
-                                    <td>@r.UnitNumber</td>
-                                    <td>@r.Title</td>
-                                    <td><span class="status-badge @UrgencyClass(r.UrgencyLevel)">@r.UrgencyLevel</span></td>
-                                    <td><span class="status-badge @StatusClass(r.Status)">@r.Status</span></td>
-                                    <td>@r.CreatedAt.ToString("dd MMM yyyy")</td>
-                                    <td>@(r.CompletionDate.HasValue ? r.CompletionDate.Value.ToString("dd MMM yyyy") : "—")</td>
-                                    <td>@(r.EstimatedCost.HasValue ? "€" + r.EstimatedCost.Value.ToString("N0") : "—")</td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                </div>
-            }
-        }
     }
 
 </div>
@@ -332,13 +255,11 @@
     bool loading, hasRun, exporting;
     string selectedReport = "OccupancySummary";
     int selectedPropertyId;
-    DateTime? dateFrom, dateTo;
     List<Property> properties = new();
 
     List<OccupancyRow>?          occupancyRows;
     List<RentRollRow>?           rentRollRows;
     List<OutstandingPaymentRow>? outstandingRows;
-    List<MaintenanceLogRow>?     maintenanceRows;
 
     protected override async Task OnInitializedAsync()
     {
@@ -351,7 +272,6 @@
         occupancyRows   = null;
         rentRollRows    = null;
         outstandingRows = null;
-        maintenanceRows = null;
 
         switch (selectedReport)
         {
@@ -364,9 +284,6 @@
             case "OutstandingPayments":
                 outstandingRows = await ReportService.GetOutstandingPaymentsAsync(selectedPropertyId);
                 break;
-            case "MaintenanceLog":
-                maintenanceRows = await ReportService.GetMaintenanceLogAsync(selectedPropertyId, dateFrom, dateTo);
-                break;
         }
 
         loading = false;
@@ -376,26 +293,11 @@
     async Task ExportExcel()
     {
         exporting = true;
-        var bytes    = await ReportService.ExportToExcelAsync(selectedReport, selectedPropertyId, dateFrom, dateTo);
+        var bytes    = await ReportService.ExportToExcelAsync(selectedReport, selectedPropertyId);
         var base64   = Convert.ToBase64String(bytes);
         var filename = $"{selectedReport}_{DateTime.Today:yyyyMMdd}.xlsx";
         await JS.InvokeVoidAsync("downloadFile", filename, base64);
         exporting = false;
     }
 
-    static string UrgencyClass(UrgencyLevel u) => u switch
-    {
-        UrgencyLevel.High      => "danger",
-        UrgencyLevel.Emergency => "danger",
-        UrgencyLevel.Low       => "active",
-        _                      => "warning"
-    };
-
-    static string StatusClass(MaintenanceStatus s) => s switch
-    {
-        MaintenanceStatus.Completed  => "active",
-        MaintenanceStatus.Cancelled  => "inactive",
-        MaintenanceStatus.InProgress => "warning",
-        _                            => "warning"
-    };
 }

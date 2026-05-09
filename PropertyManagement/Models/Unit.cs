@@ -33,5 +33,4 @@ public class Unit
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public ICollection<Lease> Leases { get; set; } = new List<Lease>();
-    public ICollection<MaintenanceRequest> MaintenanceRequests { get; set; } = new List<MaintenanceRequest>();
 }

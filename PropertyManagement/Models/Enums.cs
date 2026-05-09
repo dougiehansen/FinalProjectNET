@@ -14,23 +14,6 @@ public enum SignatureStatus
     Declined
 }
 
-public enum MaintenanceStatus
-{
-    Open,
-    Assigned,
-    InProgress,
-    Completed,
-    Cancelled
-}
-
-public enum UrgencyLevel
-{
-    Low,
-    Medium,
-    High,
-    Emergency
-}
-
 public enum PaymentMethod
 {
     BankTransfer,

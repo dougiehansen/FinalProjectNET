@@ -51,7 +51,6 @@
         </div>
     </div>
 
-    <!-- Success alert, dismissed by clearing the message string -->
     @if (!string.IsNullOrEmpty(successMsg))
     {
         <div class="alert-banner success">
@@ -470,14 +469,17 @@
         await LoadLeases();
     }
 
-    /// <summary>
-    /// Maps each LeaseStatus value to the corresponding theme.css
-    /// status-badge modifier class defined in theme.css.
-    /// </summary>
     async Task SendForSigning(Lease l)
     {
-        await DocumentService.SendSigningEmailAsync(l);
-        successMsg = $"Signing email sent to {l.Tenant.Email}.";
+        try
+        {
+            await DocumentService.SendSigningEmailAsync(l);
+            successMsg = $"Signing email sent to {l.Tenant.Email}.";
+        }
+        catch (Exception ex)
+        {
+            formError = $"Failed to send signing email: {ex.Message}";
+        }
     }
 
     string GetStatusClass(LeaseStatus s) => s switch

@@ -64,7 +64,6 @@ builder.Services.AddScoped<IPropertyService, PropertyService>();
 builder.Services.AddScoped<IUnitService, UnitService>();
 builder.Services.AddScoped<ILeaseService, LeaseService>();
 builder.Services.AddScoped<ITenantService, TenantService>();
-builder.Services.AddScoped<IMaintenanceService, MaintenanceService>();
 builder.Services.AddScoped<IRentPaymentService, RentPaymentService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IDocumentService, DocumentService>();
@@ -72,6 +71,14 @@ builder.Services.AddSingleton<LeaseNotificationService>();
 builder.Services.AddHostedService<LeaseExpiryWorker>();
 
 var app = builder.Build();
+
+var connStr = builder.Configuration.GetConnectionString("DefaultConnection") ?? "";
+if (connStr.Contains("Data Source="))
+{
+    var dataSource = connStr.Split(new[] { "Data Source=" }, StringSplitOptions.None).Last().Split(';').First().Trim();
+    if (Path.IsPathRooted(dataSource))
+        Directory.CreateDirectory(Path.GetDirectoryName(dataSource)!);
+}
 
 using (var scope = app.Services.CreateScope())
 {

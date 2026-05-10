@@ -44,7 +44,7 @@
         </div>
         <div class="stat-card">
             <div class="stat-label">Events Today</div>
-            <div class="stat-value">@auditLogs.Count(a => a.CreatedAt.Date == DateTime.UtcNow.Date)</div>
+            <div class="stat-value">@eventsToday</div>
             <div class="stat-sub">Admin actions logged</div>
         </div>
     </section>
@@ -200,6 +200,7 @@
                             <option value="User Updated">User Updated</option>
                             <option value="User Activated">User Activated</option>
                             <option value="User Deactivated">User Deactivated</option>
+                            <option value="Access Changed">Access Changed</option>
                         </select>
                     </div>
                 }
@@ -374,7 +375,8 @@
     List<User> users              = new();
     List<AuditLog> auditLogs      = new();
     List<Property> allProperties  = new();
-    HashSet<int> assignedPropertyIds = new();
+    HashSet<int> assignedPropertyIds  = new();
+    HashSet<int> originalPropertyIds  = new();
     Dictionary<int, int> assignmentCounts = new();
     int totalPropertyCount;
     User editing             = new();
@@ -385,6 +387,7 @@
     string logSearch         = string.Empty, logActionFilter = string.Empty;
     string currentUserName   = string.Empty;
     UserRole originalRole;
+    int eventsToday;
 
     // User table pagination
     int userPage = 1;
@@ -415,11 +418,12 @@
     {
         var authState     = await AuthStateProvider.GetAuthenticationStateAsync();
         currentUserName   = authState.User.Identity?.Name ?? "Unknown";
-        users             = await UserService.GetAllAsync();
-        auditLogs         = await AuditService.GetRecentAsync();
-        assignmentCounts  = await UserService.GetAssignmentCountsAsync();
+        users              = await UserService.GetAllAsync();
+        auditLogs          = await AuditService.GetRecentAsync();
+        eventsToday        = await AuditService.GetTodayCountAsync();
+        assignmentCounts   = await UserService.GetAssignmentCountsAsync();
         totalPropertyCount = (await PropertyService.GetAllAsync()).Count;
-        loading           = false;
+        loading            = false;
     }
 
     async Task OpenCreateForm()
@@ -445,6 +449,7 @@
         allProperties        = await PropertyService.GetAllAsync();
         var ids              = await UserService.GetAssignedPropertyIdsAsync(u.Id);
         assignedPropertyIds  = ids.ToHashSet();
+        originalPropertyIds  = ids.ToHashSet();
         showForm             = true;
     }
 
@@ -489,12 +494,23 @@
         }
 
         if (editing.Role != UserRole.Administrator)
+        {
             await UserService.SetPropertyAssignmentsAsync(editing.Id, assignedPropertyIds);
+
+            if (!isNew && !assignedPropertyIds.SetEquals(originalPropertyIds))
+            {
+                var oldAccess = originalPropertyIds.Count == 0 ? "All properties" : $"{originalPropertyIds.Count} properties";
+                var newAccess = assignedPropertyIds.Count  == 0 ? "All properties" : $"{assignedPropertyIds.Count} properties";
+                await AuditService.LogAsync("Access Changed", editing.FullName, editing.Email, currentUserName,
+                    $"Property access: {oldAccess} → {newAccess}");
+            }
+        }
 
         showForm   = false;
         successMsg = isNew ? "User created successfully." : "User updated successfully.";
         users      = await UserService.GetAllAsync();
         auditLogs  = await AuditService.GetRecentAsync();
+        eventsToday = await AuditService.GetTodayCountAsync();
         assignmentCounts = await UserService.GetAssignmentCountsAsync();
     }
 
@@ -505,10 +521,11 @@
         if (pendingDisable == null) return;
         await UserService.DeactivateAsync(pendingDisable.Id);
         await AuditService.LogAsync("User Deactivated", pendingDisable.FullName, pendingDisable.Email, currentUserName);
-        successMsg      = "User deactivated.";
-        pendingDisable  = null;
-        users           = await UserService.GetAllAsync();
-        auditLogs       = await AuditService.GetRecentAsync();
+        successMsg       = "User deactivated.";
+        pendingDisable   = null;
+        users            = await UserService.GetAllAsync();
+        auditLogs        = await AuditService.GetRecentAsync();
+        eventsToday      = await AuditService.GetTodayCountAsync();
         assignmentCounts = await UserService.GetAssignmentCountsAsync();
     }
 
@@ -516,9 +533,10 @@
     {
         await UserService.ActivateAsync(u.Id);
         await AuditService.LogAsync("User Activated", u.FullName, u.Email, currentUserName);
-        successMsg = "User activated.";
-        users      = await UserService.GetAllAsync();
-        auditLogs  = await AuditService.GetRecentAsync();
+        successMsg       = "User activated.";
+        users            = await UserService.GetAllAsync();
+        auditLogs        = await AuditService.GetRecentAsync();
+        eventsToday      = await AuditService.GetTodayCountAsync();
         assignmentCounts = await UserService.GetAssignmentCountsAsync();
     }
 
@@ -550,6 +568,7 @@
         "User Updated"     => "✏️",
         "User Deactivated" => "🚫",
         "User Activated"   => "✅",
+        "Access Changed"   => "🏢",
         _                  => "📋"
     };
 
@@ -559,6 +578,7 @@
         "User Updated"     => "#dbeafe",
         "User Deactivated" => "#fee2e2",
         "User Activated"   => "#dcfce7",
+        "Access Changed"   => "#fef9c3",
         _                  => "#f3f4f6"
     };
 
@@ -568,6 +588,7 @@
         "User Updated"     => "#2563eb",
         "User Deactivated" => "#dc2626",
         "User Activated"   => "#16a34a",
+        "Access Changed"   => "#b45309",
         _                  => "#6b7280"
     };
 }

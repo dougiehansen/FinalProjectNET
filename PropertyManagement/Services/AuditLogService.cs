@@ -24,9 +24,17 @@ public class AuditLogService : IAuditLogService
         await _db.SaveChangesAsync();
     }
 
-    public async Task<List<AuditLog>> GetRecentAsync(int count = 30) =>
+    public async Task<List<AuditLog>> GetRecentAsync(int count = 200) =>
         await _db.AuditLogs
             .OrderByDescending(a => a.CreatedAt)
             .Take(count)
             .ToListAsync();
+
+    public async Task<int> GetTodayCountAsync()
+    {
+        var today    = DateTime.UtcNow.Date;
+        var tomorrow = today.AddDays(1);
+        return await _db.AuditLogs
+            .CountAsync(a => a.CreatedAt >= today && a.CreatedAt < tomorrow);
+    }
 }

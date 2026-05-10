@@ -56,6 +56,16 @@ public static class DbInitializer
             await cmd.ExecuteNonQueryAsync();
         }
 
+        using (var cmd = conn.CreateCommand())
+        {
+            cmd.CommandText = @"CREATE TABLE IF NOT EXISTS UserPropertyAssignments (
+                UserId     INTEGER NOT NULL REFERENCES Users(Id),
+                PropertyId INTEGER NOT NULL REFERENCES Properties(Id),
+                PRIMARY KEY (UserId, PropertyId)
+            )";
+            await cmd.ExecuteNonQueryAsync();
+        }
+
         await conn.CloseAsync();
 
         if (db.Users.Any()) return;

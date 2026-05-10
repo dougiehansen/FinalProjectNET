@@ -6,6 +6,8 @@
 @inject IPropertyService PropertyService
 @inject IDocumentService DocumentService
 @inject PropertyManagement.Services.LeaseNotificationService NotificationService
+@inject IPropertyAccessService AccessService
+@inject AuthenticationStateProvider AuthStateProvider
 @using PropertyManagement.Models
 @implements IDisposable
 
@@ -316,12 +318,15 @@
     string successMsg = string.Empty, formError = string.Empty;
 
     HashSet<int> recentlyUpdated = new();
+    HashSet<int>? allowedIds;
     bool _reloadNeeded;
     PeriodicTimer? _timer;
 
     protected override async Task OnInitializedAsync()
     {
         NotificationService.OnSigningActivity += OnActivityReceived;
+        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+        allowedIds = await AccessService.GetAllowedIdsAsync(auth.User);
         await LoadLeases();
         allTenants    = await TenantService.GetAllAsync();
         allProperties = await PropertyService.GetAllAsync();
@@ -394,7 +399,11 @@
         _timer?.Dispose();
     }
 
-    async Task LoadLeases() => leases = await LeaseService.GetAllAsync();
+    async Task LoadLeases()
+    {
+        var all = await LeaseService.GetAllAsync();
+        leases = allowedIds == null ? all : all.Where(l => allowedIds.Contains(l.Unit.PropertyId)).ToList();
+    }
 
     void OpenCreateForm()
     {

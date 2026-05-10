@@ -84,10 +84,29 @@ public class UserService : IUserService
         }
     }
 
-    /// <inheritdoc/>
     public async Task<List<User>> GetByRoleAsync(UserRole role) =>
         await _db.Users
             .Where(u => u.Role == role && u.IsActive)
             .OrderBy(u => u.LastName)
             .ToListAsync();
+
+    public async Task<List<int>> GetAssignedPropertyIdsAsync(int userId) =>
+        await _db.UserPropertyAssignments
+            .Where(a => a.UserId == userId)
+            .Select(a => a.PropertyId)
+            .ToListAsync();
+
+    public async Task SetPropertyAssignmentsAsync(int userId, IEnumerable<int> propertyIds)
+    {
+        var existing = _db.UserPropertyAssignments.Where(a => a.UserId == userId);
+        _db.UserPropertyAssignments.RemoveRange(existing);
+        foreach (var pid in propertyIds)
+            _db.UserPropertyAssignments.Add(new Models.UserPropertyAssignment { UserId = userId, PropertyId = pid });
+        await _db.SaveChangesAsync();
+    }
+
+    public async Task<Dictionary<int, int>> GetAssignmentCountsAsync() =>
+        (await _db.UserPropertyAssignments.ToListAsync())
+            .GroupBy(a => a.UserId)
+            .ToDictionary(g => g.Key, g => g.Count());
 }

@@ -3,6 +3,8 @@
 @inject IPropertyService PropertyService
 @inject IReportService ReportService
 @inject IJSRuntime JS
+@inject IPropertyAccessService AccessService
+@inject AuthenticationStateProvider AuthStateProvider
 @using PropertyManagement.Models
 
 <PageTitle>Reports - PropertyMS</PageTitle>
@@ -263,7 +265,10 @@
 
     protected override async Task OnInitializedAsync()
     {
-        properties = await PropertyService.GetAllAsync();
+        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+        var allowedIds = await AccessService.GetAllowedIdsAsync(auth.User);
+        var all = await PropertyService.GetAllAsync();
+        properties = allowedIds == null ? all : all.Where(p => allowedIds.Contains(p.Id)).ToList();
     }
 
     async Task RunReport()

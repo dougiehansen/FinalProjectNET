@@ -2,9 +2,12 @@
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @inject ApplicationDbContext Db
 @inject IJSRuntime JS
+@inject IPropertyAccessService AccessService
+@inject AuthenticationStateProvider AuthStateProvider
 @using Microsoft.EntityFrameworkCore
 @using PropertyManagement.Data
 @using PropertyManagement.Models
+@using PropertyManagement.Services
 @implements IDisposable
 
 <PageTitle>Dashboard - PropertyMS</PageTitle>
@@ -146,16 +149,21 @@
 
     protected override async Task OnInitializedAsync()
     {
-        totalProperties = await Db.Properties.CountAsync(p => p.IsActive);
-        totalUnits      = await Db.Units.CountAsync(u => u.IsActive);
-        occupiedUnits   = await Db.Units.CountAsync(u => u.IsActive && u.IsOccupied);
-        activeLeases    = await Db.Leases.CountAsync(l => l.Status == LeaseStatus.Active);
-        portfolioAvg    = await Db.Units.AnyAsync(u => u.IsActive)
-            ? Math.Round(await Db.Units.Where(u => u.IsActive).AverageAsync(u => u.MonthlyRent), 0)
+        var auth      = await AuthStateProvider.GetAuthenticationStateAsync();
+        var allowed   = await AccessService.GetAllowedIdsAsync(auth.User);
+
+        totalProperties = await Db.Properties.CountAsync(p => p.IsActive && (allowed == null || allowed.Contains(p.Id)));
+        totalUnits      = await Db.Units.CountAsync(u => u.IsActive && (allowed == null || allowed.Contains(u.PropertyId)));
+        occupiedUnits   = await Db.Units.CountAsync(u => u.IsActive && u.IsOccupied && (allowed == null || allowed.Contains(u.PropertyId)));
+        activeLeases    = await Db.Leases.CountAsync(l => l.Status == LeaseStatus.Active && (allowed == null || allowed.Contains(l.Unit.PropertyId)));
+
+        var rentQuery = Db.Units.Where(u => u.IsActive && (allowed == null || allowed.Contains(u.PropertyId)));
+        portfolioAvg  = await rentQuery.AnyAsync()
+            ? Math.Round(await rentQuery.AverageAsync(u => u.MonthlyRent), 0)
             : 0;
 
         pins = await Db.Properties
-            .Where(p => p.IsActive && p.Latitude != 0)
+            .Where(p => p.IsActive && p.Latitude != 0 && (allowed == null || allowed.Contains(p.Id)))
             .Select(p => new PropertyMapPin
             {
                 Name          = p.Name,

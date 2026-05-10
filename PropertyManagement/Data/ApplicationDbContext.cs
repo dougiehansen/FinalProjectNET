@@ -14,4 +14,11 @@ public class ApplicationDbContext : DbContext
     public DbSet<Lease> Leases { get; set; }
     public DbSet<RentPayment> RentPayments { get; set; }
     public DbSet<AuditLog> AuditLogs { get; set; }
+    public DbSet<UserPropertyAssignment> UserPropertyAssignments { get; set; }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<UserPropertyAssignment>()
+            .HasKey(x => new { x.UserId, x.PropertyId });
+    }
 }

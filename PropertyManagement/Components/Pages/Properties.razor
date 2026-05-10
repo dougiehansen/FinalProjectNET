@@ -5,6 +5,8 @@
 @inject ILeaseService LeaseService
 @inject NavigationManager Nav
 @inject IWebHostEnvironment Env
+@inject IPropertyAccessService AccessService
+@inject AuthenticationStateProvider AuthStateProvider
 
 <PageTitle>Properties - PropertyMS</PageTitle>
 
@@ -461,9 +463,17 @@
         if (filteredProps.Any()) expandedProps.Add(filteredProps[0].Id);
     }
 
+    HashSet<int>? allowedIds;
+
     async Task LoadData()
     {
-        properties = await PropertyService.GetAllAsync();
+        if (allowedIds == null)
+        {
+            var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+            allowedIds = await AccessService.GetAllowedIdsAsync(auth.User);
+        }
+        var all = await PropertyService.GetAllAsync();
+        properties = allowedIds == null ? all : all.Where(p => allowedIds.Contains(p.Id)).ToList();
         activeLeasesByUnit = await LeaseService.GetActiveLeasesByUnitAsync();
         ApplyFilters();
     }

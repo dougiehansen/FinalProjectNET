@@ -13,6 +13,12 @@ public class TenantService : ITenantService
     public async Task<List<Tenant>> GetAllAsync() =>
         await _db.Tenants.OrderBy(t => t.LastName).ThenBy(t => t.FirstName).ToListAsync();
 
+    public async Task<List<Tenant>> GetByPropertyIdsAsync(HashSet<int> propertyIds) =>
+        await _db.Tenants
+            .Where(t => _db.Leases.Any(l => l.TenantId == t.Id && propertyIds.Contains(l.Unit.PropertyId)))
+            .OrderBy(t => t.LastName).ThenBy(t => t.FirstName)
+            .ToListAsync();
+
     public async Task CreateAsync(Tenant tenant)
     {
         tenant.CreatedAt = DateTime.UtcNow;

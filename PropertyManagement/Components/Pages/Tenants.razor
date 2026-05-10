@@ -1,6 +1,8 @@
 @page "/tenants"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Administrator,PropertyManager")]
 @inject ITenantService TenantService
+@inject IPropertyAccessService AccessService
+@inject AuthenticationStateProvider AuthStateProvider
 
 <PageTitle>Tenants - PropertyMS</PageTitle>
 
@@ -204,6 +206,7 @@
     List<Tenant> tenants = new();
     Tenant editing = new();
     string successMsg = string.Empty, formError = string.Empty, searchTerm = string.Empty;
+    HashSet<int>? allowedIds;
 
     IEnumerable<Tenant> FilteredTenants => string.IsNullOrWhiteSpace(searchTerm)
         ? tenants
@@ -212,9 +215,16 @@
 
     protected override async Task OnInitializedAsync()
     {
-        tenants = await TenantService.GetAllAsync();
+        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+        allowedIds = await AccessService.GetAllowedIdsAsync(auth.User);
+        tenants = await LoadTenants();
         loading = false;
     }
+
+    async Task<List<Tenant>> LoadTenants() =>
+        allowedIds == null
+            ? await TenantService.GetAllAsync()
+            : await TenantService.GetByPropertyIdsAsync(allowedIds);
 
     void OpenForm(Tenant? t = null)
     {
@@ -239,13 +249,13 @@
 
         showForm = false;
         successMsg = editing.Id == 0 ? "Tenant added." : "Tenant updated.";
-        tenants = await TenantService.GetAllAsync();
+        tenants = await LoadTenants();
     }
 
     async Task Deactivate(int id)
     {
         await TenantService.DeactivateAsync(id);
         successMsg = "Tenant deactivated.";
-        tenants = await TenantService.GetAllAsync();
+        tenants = await LoadTenants();
     }
 }

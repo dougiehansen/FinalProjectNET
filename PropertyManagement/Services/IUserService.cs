@@ -14,9 +14,9 @@ public interface IUserService
     Task DeactivateAsync(int userId);
     Task ActivateAsync(int userId);
 
-    /// <summary>
-    /// Returns all active users with the given role — used to populate
-    /// the maintenance staff assignment dropdown.
-    /// </summary>
     Task<List<User>> GetByRoleAsync(UserRole role);
+
+    Task<List<int>> GetAssignedPropertyIdsAsync(int userId);
+    Task SetPropertyAssignmentsAsync(int userId, IEnumerable<int> propertyIds);
+    Task<Dictionary<int, int>> GetAssignmentCountsAsync();
 }

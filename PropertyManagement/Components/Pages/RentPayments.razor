@@ -3,6 +3,7 @@
 @inject IRentPaymentService RentPaymentService
 @inject ILeaseService LeaseService
 @inject AuthenticationStateProvider AuthStateProvider
+@inject IPropertyAccessService AccessService
 
 <PageTitle>Rent Payments - PropertyMS</PageTitle>
 
@@ -295,6 +296,7 @@
     record ScheduledPayment(DateTime DueDate, Lease Lease);
 
     bool loading = true, showForm;
+    HashSet<int>? allowedIds;
     List<RentPayment> payments = new();
     List<Lease> activeLeases = new();
     Dictionary<int, decimal> leaseBalances = new();
@@ -325,10 +327,12 @@
     {
         var state = await AuthStateProvider.GetAuthenticationStateAsync();
         int.TryParse(state.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out currentUserId);
+        allowedIds = await AccessService.GetAllowedIdsAsync(state.User);
 
-        payments = await RentPaymentService.GetAllAsync();
+        var allPayments = await RentPaymentService.GetAllAsync();
+        payments = allowedIds == null ? allPayments : allPayments.Where(p => allowedIds.Contains(p.Lease.Unit.PropertyId)).ToList();
         var allLeases = await LeaseService.GetAllAsync();
-        activeLeases = allLeases.Where(l => l.Status == LeaseStatus.Active).ToList();
+        activeLeases = allLeases.Where(l => l.Status == LeaseStatus.Active && (allowedIds == null || allowedIds.Contains(l.Unit.PropertyId))).ToList();
         await LoadBalances();
         loading = false;
     }
@@ -390,7 +394,8 @@
 
         showForm = false;
         successMsg = "Payment recorded successfully.";
-        payments = await RentPaymentService.GetAllAsync();
+        var allPayments = await RentPaymentService.GetAllAsync();
+        payments = allowedIds == null ? allPayments : allPayments.Where(p => allowedIds.Contains(p.Lease.Unit.PropertyId)).ToList();
         await LoadBalances();
     }
 }

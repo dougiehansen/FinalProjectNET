@@ -2,6 +2,7 @@
 @attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Administrator")]
 @inject IUserService UserService
 @inject IAuditLogService AuditService
+@inject IPropertyService PropertyService
 @inject AuthenticationStateProvider AuthStateProvider
 @using PropertyManagement.Models
 
@@ -85,6 +86,7 @@
                         <tr>
                             <th>User</th>
                             <th>Role</th>
+                            <th>Property Access</th>
                             <th>Status</th>
                             <th>Last Login</th>
                             <th style="text-align:right;">Actions</th>
@@ -104,6 +106,24 @@
                                     </div>
                                 </td>
                                 <td><span style="font-weight:600;font-size:0.9rem;color:#374151">@u.Role</span></td>
+                                <td>
+                                    @if (u.Role == UserRole.Administrator)
+                                    {
+                                        <span style="font-size:0.78rem;color:#16a34a;font-weight:600;">Full access</span>
+                                    }
+                                    else
+                                    {
+                                        var count = assignmentCounts.GetValueOrDefault(u.Id, 0);
+                                        if (count == 0)
+                                        {
+                                            <span style="font-size:0.78rem;color:#94a3b8;">All properties</span>
+                                        }
+                                        else
+                                        {
+                                            <span style="font-size:0.78rem;color:#2563eb;font-weight:600;">@count of @totalPropertyCount</span>
+                                        }
+                                    }
+                                </td>
                                 <td>
                                     <span class="status-badge @(u.IsActive ? "active" : "inactive")">
                                         @(u.IsActive ? "Active" : "Inactive")
@@ -244,6 +264,33 @@
                         <input class="form-check-input" type="checkbox" @bind="editing.IsActive" id="userActive" />
                         <label class="form-check-label" for="userActive">Account Active</label>
                     </div>
+
+                    @if (editing.Role != UserRole.Administrator)
+                    {
+                        <div class="mb-3" style="margin-top:1rem;">
+                            <label class="form-label fw-semibold">
+                                🏢 Property Access
+                            </label>
+                            <div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;padding:12px 14px;">
+                                @foreach (var p in allProperties)
+                                {
+                                    <div style="display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid #f1f5f9;">
+                                        <input type="checkbox" id="prop-@p.Id"
+                                               checked="@assignedPropertyIds.Contains(p.Id)"
+                                               @onchange="e => ToggleProperty(p.Id, (bool)e.Value!)"
+                                               style="width:15px;height:15px;cursor:pointer;" />
+                                        <label for="prop-@p.Id" style="font-size:0.85rem;cursor:pointer;margin:0;flex:1;">
+                                            <strong>@p.Name</strong>
+                                            <span style="color:#94a3b8;font-size:0.78rem;margin-left:6px;">@p.City</span>
+                                        </label>
+                                    </div>
+                                }
+                                <p style="font-size:0.72rem;color:#94a3b8;margin:8px 0 0;">
+                                    Leave all unchecked to grant access to all properties.
+                                </p>
+                            </div>
+                        </div>
+                    }
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-secondary" @onclick="() => showForm = false">Cancel</button>
@@ -256,8 +303,12 @@
 
 @code {
     bool loading = true, showForm, showFeed = true;
-    List<User> users         = new();
-    List<AuditLog> auditLogs = new();
+    List<User> users              = new();
+    List<AuditLog> auditLogs      = new();
+    List<Property> allProperties  = new();
+    HashSet<int> assignedPropertyIds = new();
+    Dictionary<int, int> assignmentCounts = new();
+    int totalPropertyCount;
     User editing             = new();
     string password          = string.Empty;
     string successMsg        = string.Empty, formError = string.Empty;
@@ -277,28 +328,35 @@
         currentUserName   = authState.User.Identity?.Name ?? "Unknown";
         users             = await UserService.GetAllAsync();
         auditLogs         = await AuditService.GetRecentAsync();
+        assignmentCounts  = await UserService.GetAssignmentCountsAsync();
+        totalPropertyCount = (await PropertyService.GetAllAsync()).Count;
         loading           = false;
     }
 
-    void OpenCreateForm()
+    async Task OpenCreateForm()
     {
-        editing    = new User { IsActive = true };
-        password   = string.Empty;
-        formError  = string.Empty;
-        showForm   = true;
+        editing              = new User { IsActive = true };
+        password             = string.Empty;
+        formError            = string.Empty;
+        assignedPropertyIds  = new();
+        allProperties        = await PropertyService.GetAllAsync();
+        showForm             = true;
     }
 
-    void OpenEditForm(User u)
+    async Task OpenEditForm(User u)
     {
         editing = new User
         {
             Id = u.Id, FirstName = u.FirstName, LastName = u.LastName,
             Email = u.Email, Role = u.Role, IsActive = u.IsActive, PasswordHash = u.PasswordHash
         };
-        originalRole = u.Role;
-        password     = string.Empty;
-        formError    = string.Empty;
-        showForm     = true;
+        originalRole         = u.Role;
+        password             = string.Empty;
+        formError            = string.Empty;
+        allProperties        = await PropertyService.GetAllAsync();
+        var ids              = await UserService.GetAssignedPropertyIdsAsync(u.Id);
+        assignedPropertyIds  = ids.ToHashSet();
+        showForm             = true;
     }
 
     async Task Save()
@@ -341,10 +399,14 @@
             await AuditService.LogAsync("User Updated", editing.FullName, editing.Email, currentUserName, details);
         }
 
-        showForm  = false;
+        if (editing.Role != UserRole.Administrator)
+            await UserService.SetPropertyAssignmentsAsync(editing.Id, assignedPropertyIds);
+
+        showForm   = false;
         successMsg = isNew ? "User created successfully." : "User updated successfully.";
         users      = await UserService.GetAllAsync();
         auditLogs  = await AuditService.GetRecentAsync();
+        assignmentCounts = await UserService.GetAssignmentCountsAsync();
     }
 
     async Task Deactivate(User u)
@@ -363,6 +425,12 @@
         successMsg = "User activated.";
         users      = await UserService.GetAllAsync();
         auditLogs  = await AuditService.GetRecentAsync();
+    }
+
+    void ToggleProperty(int propId, bool isChecked)
+    {
+        if (isChecked) assignedPropertyIds.Add(propId);
+        else assignedPropertyIds.Remove(propId);
     }
 
     static string Initials(User u) =>

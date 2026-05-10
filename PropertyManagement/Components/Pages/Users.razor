@@ -56,16 +56,16 @@
                     <circle cx="6.5" cy="6.5" r="5" stroke="currentColor" stroke-width="1.5"/>
                     <path d="M10.5 10.5l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
                 </svg>
-                <input class="search-inp" type="text" placeholder="Search by name or email..." @bind="searchText" @bind:event="oninput" />
+                <input class="search-inp" type="text" placeholder="Search by name or email..." @bind="searchText" @bind:event="oninput" @bind:after="OnUserFilterChanged" />
             </div>
-            <select class="filter-select" @bind="roleFilter">
+            <select class="filter-select" @bind="roleFilter" @bind:after="OnUserFilterChanged">
                 <option value="">All Roles</option>
                 @foreach (var r in Enum.GetValues<UserRole>())
                 {
                     <option value="@r">@r</option>
                 }
             </select>
-            <select class="filter-select" @bind="statusFilter">
+            <select class="filter-select" @bind="statusFilter" @bind:after="OnUserFilterChanged">
                 <option value="">All Statuses</option>
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
@@ -93,7 +93,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var u in FilteredUsers)
+                        @foreach (var u in PagedUsers)
                         {
                             <tr>
                                 <td>
@@ -135,7 +135,7 @@
                                         <button class="btn-action sm" @onclick="() => OpenEditForm(u)">Edit</button>
                                         @if (u.IsActive)
                                         {
-                                            <button class="btn-action sm danger" @onclick="() => Deactivate(u)">Disable</button>
+                                            <button class="btn-action sm danger" @onclick="() => ConfirmDisable(u)">Disable</button>
                                         }
                                         else
                                         {
@@ -149,6 +149,19 @@
                 </table>
             }
         </div>
+
+        @if (!loading && UserTotalPages > 1)
+        {
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-top:1px solid var(--border);">
+                <span style="font-size:0.8rem;color:var(--grey);">
+                    Page @userPage of @UserTotalPages &nbsp;·&nbsp; @FilteredUsers.Count() users
+                </span>
+                <div style="display:flex;gap:6px;">
+                    <button class="btn-action sm" disabled="@(userPage <= 1)" @onclick="() => userPage--">← Prev</button>
+                    <button class="btn-action sm" disabled="@(userPage >= UserTotalPages)" @onclick="() => userPage++">Next →</button>
+                </div>
+            </div>
+        }
     </section>
 
     <!-- Activity Feed -->
@@ -173,22 +186,39 @@
         @if (showFeed)
         {
             <div style="border-top:1px solid var(--border);">
-                @if (!auditLogs.Any())
+                @if (auditLogs.Any())
+                {
+                    <!-- Log filter bar -->
+                    <div style="display:flex;gap:10px;padding:12px 20px;border-bottom:1px solid var(--border);flex-wrap:wrap;">
+                        <input type="text" placeholder="Search by name or email…"
+                               style="padding:6px 12px;border:1px solid #d1d5db;border-radius:7px;font-size:0.82rem;flex:1;min-width:160px;"
+                               @bind="logSearch" @bind:event="oninput" @bind:after="OnLogFilterChanged" />
+                        <select style="padding:6px 10px;border:1px solid #d1d5db;border-radius:7px;font-size:0.82rem;"
+                                @bind="logActionFilter" @bind:after="OnLogFilterChanged">
+                            <option value="">All Actions</option>
+                            <option value="User Created">User Created</option>
+                            <option value="User Updated">User Updated</option>
+                            <option value="User Activated">User Activated</option>
+                            <option value="User Deactivated">User Deactivated</option>
+                        </select>
+                    </div>
+                }
+
+                @if (!FilteredLogs.Any())
                 {
                     <div class="empty-state" style="padding:32px 20px;">
                         <div class="empty-icon">📋</div>
-                        <h3>No activity yet</h3>
-                        <p>Actions will appear here as users are created, modified, or disabled.</p>
+                        <h3>@(auditLogs.Any() ? "No matching events" : "No activity yet")</h3>
+                        <p>@(auditLogs.Any() ? "Try adjusting the filters." : "Actions will appear here as users are created, modified, or disabled.")</p>
                     </div>
                 }
                 else
                 {
                     <div style="padding:4px 0;">
-                        @foreach (var log in auditLogs)
+                        @foreach (var log in PagedLogs)
                         {
                             <div style="display:flex;align-items:flex-start;gap:14px;padding:13px 20px;border-bottom:1px solid #f8fafc;transition:background 0.15s;"
                                  onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
-                                <!-- Coloured action dot -->
                                 <div style="width:36px;height:36px;border-radius:50%;background:@ActionBg(log.Action);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;margin-top:1px;box-shadow:0 1px 4px rgba(0,0,0,0.08);">
                                     @ActionIcon(log.Action)
                                 </div>
@@ -211,6 +241,19 @@
                             </div>
                         }
                     </div>
+
+                    @if (LogTotalPages > 1)
+                    {
+                        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-top:1px solid var(--border);">
+                            <span style="font-size:0.8rem;color:var(--grey);">
+                                Page @logPage of @LogTotalPages &nbsp;·&nbsp; @FilteredLogs.Count() events
+                            </span>
+                            <div style="display:flex;gap:6px;">
+                                <button class="btn-action sm" disabled="@(logPage <= 1)" @onclick="() => logPage--">← Prev</button>
+                                <button class="btn-action sm" disabled="@(logPage >= LogTotalPages)" @onclick="() => logPage++">Next →</button>
+                            </div>
+                        </div>
+                    }
                 }
             </div>
         }
@@ -301,6 +344,31 @@
     </div>
 }
 
+@if (pendingDisable != null)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal d-block">
+        <div class="modal-dialog modal-sm" style="margin-top:15vh;">
+            <div class="modal-content">
+                <div class="modal-header" style="border-bottom:none;padding-bottom:0;">
+                    <h5 class="modal-title" style="color:#dc2626;">Disable Account</h5>
+                    <button type="button" class="btn-close" @onclick="() => pendingDisable = null"></button>
+                </div>
+                <div class="modal-body" style="padding-top:10px;">
+                    <p style="margin:0;color:#374151;">
+                        Are you sure you want to disable <strong>@pendingDisable.FullName</strong>?
+                        They will no longer be able to log in.
+                    </p>
+                </div>
+                <div class="modal-footer" style="border-top:none;">
+                    <button class="btn btn-secondary" @onclick="() => pendingDisable = null">Cancel</button>
+                    <button class="btn btn-danger" @onclick="Deactivate">Yes, Disable</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     bool loading = true, showForm, showFeed = true;
     List<User> users              = new();
@@ -310,17 +378,38 @@
     Dictionary<int, int> assignmentCounts = new();
     int totalPropertyCount;
     User editing             = new();
+    User? pendingDisable;
     string password          = string.Empty;
     string successMsg        = string.Empty, formError = string.Empty;
     string searchText        = string.Empty, roleFilter = string.Empty, statusFilter = string.Empty;
+    string logSearch         = string.Empty, logActionFilter = string.Empty;
     string currentUserName   = string.Empty;
     UserRole originalRole;
+
+    // User table pagination
+    int userPage = 1;
+    const int UserPageSize = 10;
+
+    // Audit log pagination
+    int logPage = 1;
+    const int LogPageSize = 15;
 
     IEnumerable<User> FilteredUsers => users.Where(u =>
         (string.IsNullOrEmpty(searchText) || u.FullName.Contains(searchText, StringComparison.OrdinalIgnoreCase) || u.Email.Contains(searchText, StringComparison.OrdinalIgnoreCase)) &&
         (string.IsNullOrEmpty(roleFilter) || u.Role.ToString() == roleFilter) &&
         (string.IsNullOrEmpty(statusFilter) || (statusFilter == "active" ? u.IsActive : !u.IsActive))
     );
+
+    IEnumerable<User> PagedUsers => FilteredUsers.Skip((userPage - 1) * UserPageSize).Take(UserPageSize);
+    int UserTotalPages => Math.Max(1, (int)Math.Ceiling(FilteredUsers.Count() / (double)UserPageSize));
+
+    IEnumerable<AuditLog> FilteredLogs => auditLogs.Where(a =>
+        (string.IsNullOrEmpty(logActionFilter) || a.Action == logActionFilter) &&
+        (string.IsNullOrEmpty(logSearch) || a.TargetName.Contains(logSearch, StringComparison.OrdinalIgnoreCase) || a.TargetEmail.Contains(logSearch, StringComparison.OrdinalIgnoreCase))
+    );
+
+    IEnumerable<AuditLog> PagedLogs => FilteredLogs.Skip((logPage - 1) * LogPageSize).Take(LogPageSize);
+    int LogTotalPages => Math.Max(1, (int)Math.Ceiling(FilteredLogs.Count() / (double)LogPageSize));
 
     protected override async Task OnInitializedAsync()
     {
@@ -409,13 +498,18 @@
         assignmentCounts = await UserService.GetAssignmentCountsAsync();
     }
 
-    async Task Deactivate(User u)
+    void ConfirmDisable(User u) => pendingDisable = u;
+
+    async Task Deactivate()
     {
-        await UserService.DeactivateAsync(u.Id);
-        await AuditService.LogAsync("User Deactivated", u.FullName, u.Email, currentUserName);
-        successMsg = "User deactivated.";
-        users      = await UserService.GetAllAsync();
-        auditLogs  = await AuditService.GetRecentAsync();
+        if (pendingDisable == null) return;
+        await UserService.DeactivateAsync(pendingDisable.Id);
+        await AuditService.LogAsync("User Deactivated", pendingDisable.FullName, pendingDisable.Email, currentUserName);
+        successMsg      = "User deactivated.";
+        pendingDisable  = null;
+        users           = await UserService.GetAllAsync();
+        auditLogs       = await AuditService.GetRecentAsync();
+        assignmentCounts = await UserService.GetAssignmentCountsAsync();
     }
 
     async Task Activate(User u)
@@ -425,7 +519,11 @@
         successMsg = "User activated.";
         users      = await UserService.GetAllAsync();
         auditLogs  = await AuditService.GetRecentAsync();
+        assignmentCounts = await UserService.GetAssignmentCountsAsync();
     }
+
+    void OnUserFilterChanged() { userPage = 1; }
+    void OnLogFilterChanged()  { logPage  = 1; }
 
     void ToggleProperty(int propId, bool isChecked)
     {

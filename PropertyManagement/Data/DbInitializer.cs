@@ -10,37 +10,26 @@ public static class DbInitializer
     {
         await db.Database.EnsureCreatedAsync();
 
-        // Add ManagerConfirmed column if upgrading an existing database
         var conn = db.Database.GetDbConnection();
         await conn.OpenAsync();
-        bool hasCol;
-        using (var cmd = conn.CreateCommand())
-        {
-            cmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Leases') WHERE name='ManagerConfirmed'";
-            hasCol = (long)(await cmd.ExecuteScalarAsync())! > 0;
-        }
-        if (!hasCol)
-        {
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = "ALTER TABLE Leases ADD COLUMN ManagerConfirmed INTEGER NOT NULL DEFAULT 0";
-            await cmd.ExecuteNonQueryAsync();
-        }
 
-        async Task AddColIfMissing(string column, string definition)
+        async Task AddColIfMissing(string table, string column, string definition)
         {
             using var c = conn.CreateCommand();
-            c.CommandText = $"SELECT COUNT(*) FROM pragma_table_info('Leases') WHERE name='{column}'";
+            c.CommandText = $"SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name='{column}'";
             if ((long)(await c.ExecuteScalarAsync())! == 0)
             {
                 using var a = conn.CreateCommand();
-                a.CommandText = $"ALTER TABLE Leases ADD COLUMN {column} {definition}";
+                a.CommandText = $"ALTER TABLE {table} ADD COLUMN {column} {definition}";
                 await a.ExecuteNonQueryAsync();
             }
         }
 
-        await AddColIfMissing("SigningPageOpenedAt", "TEXT NULL");
-        await AddColIfMissing("TenantIpAddress",     "TEXT NULL");
-        await AddColIfMissing("TenantUserAgent",     "TEXT NULL");
+        await AddColIfMissing("Leases", "ManagerConfirmed",    "INTEGER NOT NULL DEFAULT 0");
+        await AddColIfMissing("Leases", "SigningPageOpenedAt", "TEXT NULL");
+        await AddColIfMissing("Leases", "TenantIpAddress",     "TEXT NULL");
+        await AddColIfMissing("Leases", "TenantUserAgent",     "TEXT NULL");
+        await AddColIfMissing("Users",  "LastLogin",           "TEXT NULL");
 
         using (var cmd = conn.CreateCommand())
         {

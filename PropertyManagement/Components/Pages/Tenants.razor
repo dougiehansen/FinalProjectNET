@@ -83,12 +83,12 @@
                     <input class="search-inp" placeholder="Search by name or email…"
                            value="@searchTerm" @oninput="e => searchTerm = e.Value?.ToString() ?? string.Empty" />
                 </div>
-                <select class="filter-select" @bind="statusFilter">
+                <select class="filter-select" @bind="statusFilter" @bind:after="ResetPage">
                     <option value="">All Statuses</option>
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
                 </select>
-                <select class="filter-select" @bind="healthFilter">
+                <select class="filter-select" @bind="healthFilter" @bind:after="ResetPage">
                     <option value="">All Health</option>
                     <option value="Green">✅ Good</option>
                     <option value="Amber">⚠️ Attention</option>
@@ -96,7 +96,7 @@
                 </select>
             </div>
 
-            <div class="table-scroll">
+            <div class="table-scroll" @onchange="ResetPage">
                 <table class="data-table">
                     <thead>
                         <tr>
@@ -109,7 +109,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var t in FilteredTenants)
+                        @foreach (var t in PagedTenants)
                         {
                             <tr style="cursor:pointer;" @onclick="() => OpenPanel(t)" @onclick:stopPropagation="false">
                                 <td>
@@ -151,7 +151,11 @@
                                         <button class="btn-action sm" @onclick="() => OpenForm(t)">Edit</button>
                                         @if (t.IsActive)
                                         {
-                                            <button class="btn-action sm danger" @onclick="() => Deactivate(t.Id)">Deactivate</button>
+                                            <button class="btn-action sm danger" @onclick="() => pendingDeactivate = t">Deactivate</button>
+                                        }
+                                        else
+                                        {
+                                            <button class="btn-action sm primary" @onclick="() => Activate(t.Id)">Activate</button>
                                         }
                                     </div>
                                 </td>
@@ -160,6 +164,19 @@
                     </tbody>
                 </table>
             </div>
+
+            @if (TotalPages > 1)
+            {
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-top:1px solid var(--border);">
+                    <span style="font-size:0.8rem;color:var(--grey);">
+                        Page @currentPage of @TotalPages &nbsp;·&nbsp; @FilteredTenants.Count() tenants
+                    </span>
+                    <div style="display:flex;gap:6px;">
+                        <button class="btn-action sm" disabled="@(currentPage <= 1)" @onclick="() => currentPage--">← Prev</button>
+                        <button class="btn-action sm" disabled="@(currentPage >= TotalPages)" @onclick="() => currentPage++">Next →</button>
+                    </div>
+                </div>
+            }
         }
     </div>
 
@@ -234,6 +251,31 @@
             <div class="modal-foot">
                 <button class="btn-cancel" @onclick="() => showForm = false">Cancel</button>
                 <button class="btn-save" @onclick="Save">@(editing.Id == 0 ? "Add Tenant" : "Save Changes")</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (pendingDeactivate != null)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal d-block">
+        <div class="modal-dialog modal-sm" style="margin-top:15vh;">
+            <div class="modal-content">
+                <div class="modal-header" style="border-bottom:none;padding-bottom:0;">
+                    <h5 class="modal-title" style="color:#dc2626;">Deactivate Tenant</h5>
+                    <button type="button" class="btn-close" @onclick="() => pendingDeactivate = null"></button>
+                </div>
+                <div class="modal-body" style="padding-top:10px;">
+                    <p style="margin:0;color:#374151;">
+                        Are you sure you want to deactivate <strong>@pendingDeactivate.FullName</strong>?
+                        They will be marked as inactive but their records will be kept.
+                    </p>
+                </div>
+                <div class="modal-footer" style="border-top:none;">
+                    <button class="btn btn-secondary" @onclick="() => pendingDeactivate = null">Cancel</button>
+                    <button class="btn btn-danger" @onclick="Deactivate">Yes, Deactivate</button>
+                </div>
             </div>
         </div>
     </div>
@@ -410,10 +452,15 @@
     bool loading = true, showForm, panelLoading;
     List<Tenant> tenants = new();
     Dictionary<int, TenantHealthScore> healthScores = new();
-    Tenant editing = new();
+    Tenant  editing          = new();
+    Tenant? pendingDeactivate;
     string successMsg = string.Empty, formError = string.Empty;
     string searchTerm = string.Empty, statusFilter = string.Empty, healthFilter = string.Empty;
     HashSet<int>? allowedIds;
+
+    // Pagination
+    int currentPage = 1;
+    const int PageSize = 10;
 
     // Profile panel
     Tenant? selectedTenant;
@@ -426,6 +473,11 @@
         (string.IsNullOrEmpty(statusFilter)    || (statusFilter == "active" ? t.IsActive : !t.IsActive)) &&
         (string.IsNullOrEmpty(healthFilter)    || healthScores.GetValueOrDefault(t.Id)?.Level == healthFilter)
     );
+
+    IEnumerable<Tenant> PagedTenants  => FilteredTenants.Skip((currentPage - 1) * PageSize).Take(PageSize);
+    int TotalPages => Math.Max(1, (int)Math.Ceiling(FilteredTenants.Count() / (double)PageSize));
+
+    void ResetPage() => currentPage = 1;
 
     protected override async Task OnInitializedAsync()
     {
@@ -491,11 +543,21 @@
         healthScores = await TenantService.GetHealthScoresAsync(tenants.Select(t => t.Id));
     }
 
-    async Task Deactivate(int id)
+    async Task Deactivate()
     {
-        await TenantService.DeactivateAsync(id);
-        successMsg = "Tenant deactivated.";
-        tenants = await LoadTenants();
+        if (pendingDeactivate == null) return;
+        await TenantService.DeactivateAsync(pendingDeactivate.Id);
+        successMsg       = "Tenant deactivated.";
+        pendingDeactivate = null;
+        tenants      = await LoadTenants();
+        healthScores = await TenantService.GetHealthScoresAsync(tenants.Select(t => t.Id));
+    }
+
+    async Task Activate(int id)
+    {
+        await TenantService.ActivateAsync(id);
+        successMsg   = "Tenant activated.";
+        tenants      = await LoadTenants();
         healthScores = await TenantService.GetHealthScoresAsync(tenants.Select(t => t.Id));
     }
 }

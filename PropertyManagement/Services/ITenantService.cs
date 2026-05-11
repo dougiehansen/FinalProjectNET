@@ -12,4 +12,5 @@ public interface ITenantService
     Task CreateAsync(Tenant tenant);
     Task UpdateAsync(Tenant tenant);
     Task DeactivateAsync(int id);
+    Task ActivateAsync(int id);
 }

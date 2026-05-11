@@ -88,10 +88,12 @@ public class TenantService : ITenantService
     public async Task DeactivateAsync(int id)
     {
         var tenant = await _db.Tenants.FindAsync(id);
-        if (tenant != null)
-        {
-            tenant.IsActive = false;
-            await _db.SaveChangesAsync();
-        }
+        if (tenant != null) { tenant.IsActive = false; await _db.SaveChangesAsync(); }
+    }
+
+    public async Task ActivateAsync(int id)
+    {
+        var tenant = await _db.Tenants.FindAsync(id);
+        if (tenant != null) { tenant.IsActive = true; await _db.SaveChangesAsync(); }
     }
 }

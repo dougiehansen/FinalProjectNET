@@ -36,6 +36,8 @@ public class PropertyService : IPropertyService
         existing.ContactPhone = property.ContactPhone;
         existing.ContactEmail = property.ContactEmail;
         existing.ImagePath    = property.ImagePath;
+        existing.Latitude     = property.Latitude;
+        existing.Longitude    = property.Longitude;
 
         await _db.SaveChangesAsync();
     }

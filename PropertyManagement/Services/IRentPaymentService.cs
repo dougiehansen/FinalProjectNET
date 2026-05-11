@@ -22,4 +22,5 @@ public interface IRentPaymentService
     /// for that lease.
     /// </summary>
     Task RecordPaymentAsync(RentPayment payment);
+    Task<List<RentPayment>> GetRecentByLeaseIdAsync(int leaseId, int count = 3);
 }

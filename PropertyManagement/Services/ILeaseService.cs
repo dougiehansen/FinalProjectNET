@@ -44,6 +44,7 @@ public interface ILeaseService
     /// Used by the Rent Payments form to show the tenant's current debt.
     /// </summary>
     Task<decimal> GetOutstandingBalanceAsync(int leaseId);
+    Task<List<Lease>> GetByTenantIdAsync(int tenantId);
     Task<int>     AutoExpireAsync();
     Task<Lease?>  GetByTokenAsync(string token);
     Task          SignAsync(string token, string signedByName);

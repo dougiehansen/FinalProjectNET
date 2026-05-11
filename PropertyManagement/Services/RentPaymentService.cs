@@ -27,6 +27,14 @@ public class RentPaymentService : IRentPaymentService
             .ToListAsync();
 
     /// <inheritdoc/>
+    public async Task<List<RentPayment>> GetRecentByLeaseIdAsync(int leaseId, int count = 3) =>
+        await _db.RentPayments
+            .Where(p => p.LeaseId == leaseId)
+            .OrderByDescending(p => p.PaymentDate)
+            .Take(count)
+            .ToListAsync();
+
+    /// <inheritdoc/>
     public async Task RecordPaymentAsync(RentPayment payment)
     {
         var lease = await _db.Leases

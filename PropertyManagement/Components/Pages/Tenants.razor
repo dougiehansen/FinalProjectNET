@@ -21,7 +21,7 @@
     </div>
 
     <!-- Stats -->
-    <div class="stats-grid g3">
+    <div class="stats-grid g4">
         <div class="stat-card">
             <div class="stat-label">Total Tenants</div>
             <div class="stat-value">@tenants.Count</div>
@@ -36,6 +36,11 @@
             <div class="stat-label">Inactive</div>
             <div class="stat-value">@tenants.Count(t => !t.IsActive)</div>
             <div class="stat-sub">Former tenants</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">At Risk</div>
+            <div class="stat-value" style="color:var(--red)">@healthScores.Values.Count(s => s.Level == "Red")</div>
+            <div class="stat-sub">@healthScores.Values.Count(s => s.Level == "Amber") expiring / no lease</div>
         </div>
     </div>
 
@@ -75,6 +80,17 @@
                     <input class="search-inp" placeholder="Search by name or email…"
                            value="@searchTerm" @oninput="e => searchTerm = e.Value?.ToString() ?? string.Empty" />
                 </div>
+                <select class="filter-select" @bind="statusFilter">
+                    <option value="">All Statuses</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                </select>
+                <select class="filter-select" @bind="healthFilter">
+                    <option value="">All Health</option>
+                    <option value="Green">✅ Good</option>
+                    <option value="Amber">⚠️ Attention</option>
+                    <option value="Red">🔴 At Risk</option>
+                </select>
             </div>
 
             <div class="table-scroll">
@@ -85,6 +101,7 @@
                             <th>Phone</th>
                             <th>Employer</th>
                             <th>Status</th>
+                            <th>Health</th>
                             <th style="text-align:right;">Actions</th>
                         </tr>
                     </thead>
@@ -107,6 +124,24 @@
                                     <span class="status-badge @(t.IsActive ? "active" : "inactive")">
                                         @(t.IsActive ? "Active" : "Inactive")
                                     </span>
+                                </td>
+                                <td>
+                                    @{
+                                        var hs = healthScores.GetValueOrDefault(t.Id);
+                                    }
+                                    @if (hs != null)
+                                    {
+                                        <span title="@hs.Reason" style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;font-size:0.75rem;font-weight:700;cursor:default;
+                                            background:@(hs.Level == "Red" ? "#fee2e2" : hs.Level == "Amber" ? "#fef9c3" : "#dcfce7");
+                                            color:@(hs.Level == "Red" ? "#dc2626" : hs.Level == "Amber" ? "#b45309" : "#16a34a");">
+                                            @(hs.Level == "Red" ? "🔴" : hs.Level == "Amber" ? "⚠️" : "✅")
+                                            @hs.Label
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span style="color:#94a3b8;font-size:0.8rem;">—</span>
+                                    }
                                 </td>
                                 <td>
                                     <div class="action-btns">
@@ -204,20 +239,24 @@
 @code {
     bool loading = true, showForm;
     List<Tenant> tenants = new();
+    Dictionary<int, TenantHealthScore> healthScores = new();
     Tenant editing = new();
-    string successMsg = string.Empty, formError = string.Empty, searchTerm = string.Empty;
+    string successMsg = string.Empty, formError = string.Empty;
+    string searchTerm = string.Empty, statusFilter = string.Empty, healthFilter = string.Empty;
     HashSet<int>? allowedIds;
 
-    IEnumerable<Tenant> FilteredTenants => string.IsNullOrWhiteSpace(searchTerm)
-        ? tenants
-        : tenants.Where(t => t.FullName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)
-                           || t.Email.Contains(searchTerm, StringComparison.OrdinalIgnoreCase));
+    IEnumerable<Tenant> FilteredTenants => tenants.Where(t =>
+        (string.IsNullOrWhiteSpace(searchTerm) || t.FullName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) || t.Email.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) &&
+        (string.IsNullOrEmpty(statusFilter)    || (statusFilter == "active" ? t.IsActive : !t.IsActive)) &&
+        (string.IsNullOrEmpty(healthFilter)    || healthScores.GetValueOrDefault(t.Id)?.Level == healthFilter)
+    );
 
     protected override async Task OnInitializedAsync()
     {
         var auth = await AuthStateProvider.GetAuthenticationStateAsync();
         allowedIds = await AccessService.GetAllowedIdsAsync(auth.User);
         tenants = await LoadTenants();
+        healthScores = await TenantService.GetHealthScoresAsync(tenants.Select(t => t.Id));
         loading = false;
     }
 
@@ -250,6 +289,7 @@
         showForm = false;
         successMsg = editing.Id == 0 ? "Tenant added." : "Tenant updated.";
         tenants = await LoadTenants();
+        healthScores = await TenantService.GetHealthScoresAsync(tenants.Select(t => t.Id));
     }
 
     async Task Deactivate(int id)
@@ -257,5 +297,6 @@
         await TenantService.DeactivateAsync(id);
         successMsg = "Tenant deactivated.";
         tenants = await LoadTenants();
+        healthScores = await TenantService.GetHealthScoresAsync(tenants.Select(t => t.Id));
     }
 }

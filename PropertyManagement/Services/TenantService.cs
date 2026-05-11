@@ -19,6 +19,46 @@ public class TenantService : ITenantService
             .OrderBy(t => t.LastName).ThenBy(t => t.FirstName)
             .ToListAsync();
 
+    public async Task<Dictionary<int, TenantHealthScore>> GetHealthScoresAsync(IEnumerable<int> tenantIds)
+    {
+        var ids   = tenantIds.ToHashSet();
+        var today = DateTime.Today;
+
+        var activeLeases = await _db.Leases
+            .Include(l => l.RentPayments)
+            .Where(l => ids.Contains(l.TenantId) && l.Status == LeaseStatus.Active)
+            .ToListAsync();
+
+        var result = new Dictionary<int, TenantHealthScore>();
+
+        foreach (var id in ids)
+        {
+            if (!activeLeases.Any(l => l.TenantId == id))
+                result[id] = new TenantHealthScore("Amber", "No lease", "No active lease found");
+        }
+
+        foreach (var lease in activeLeases)
+        {
+            var monthsActive  = (int)Math.Max(1, Math.Floor((today - lease.StartDate).TotalDays / 30.44));
+            var totalExpected = monthsActive * lease.MonthlyRent;
+            var totalPaid     = lease.RentPayments.Sum(p => p.Amount);
+            var balance       = Math.Max(0, totalExpected - totalPaid);
+            var daysLeft      = (lease.EndDate - today).Days;
+
+            TenantHealthScore score;
+            if (balance > 0)
+                score = new TenantHealthScore("Red",   "Overdue",        $"€{balance:N0} outstanding balance");
+            else if (daysLeft <= 60)
+                score = new TenantHealthScore("Amber", "Expiring soon",  $"Lease expires in {daysLeft} days");
+            else
+                score = new TenantHealthScore("Green", "All clear",      $"Paid up · {daysLeft} days remaining");
+
+            result[lease.TenantId] = score;
+        }
+
+        return result;
+    }
+
     public async Task CreateAsync(Tenant tenant)
     {
         tenant.CreatedAt = DateTime.UtcNow;

@@ -293,7 +293,19 @@
                         <label class="form-label fw-semibold">
                             @(editing.Id == 0 ? "Password *" : "New Password (leave blank to keep current)")
                         </label>
-                        <input class="form-control" type="password" @bind="password" autocomplete="new-password" />
+                        <input class="form-control" type="password" @bind="password" @bind:event="oninput" autocomplete="new-password" />
+                        @if (!string.IsNullOrEmpty(password))
+                        {
+                            <div style="margin-top:8px;padding:10px 12px;background:#f8fafc;border-radius:8px;display:flex;flex-direction:column;gap:4px;">
+                                @foreach (var req in PasswordRequirements)
+                                {
+                                    <div style="display:flex;align-items:center;gap:7px;font-size:0.78rem;color:@(req.Met ? "#16a34a" : "#dc2626");">
+                                        <span style="font-size:0.72rem;">@(req.Met ? "✓" : "✗")</span>
+                                        @req.Label
+                                    </div>
+                                }
+                            </div>
+                        }
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-semibold">Role *</label>
@@ -465,6 +477,11 @@
             formError = "Password is required for new users.";
             return;
         }
+        if (!string.IsNullOrWhiteSpace(password) && !PasswordIsValid)
+        {
+            formError = "Password does not meet all requirements.";
+            return;
+        }
 
         var emailExists = await UserService.EmailExistsAsync(editing.Email, editing.Id == 0 ? null : editing.Id);
         if (emailExists)
@@ -542,6 +559,19 @@
 
     void OnUserFilterChanged() { userPage = 1; }
     void OnLogFilterChanged()  { logPage  = 1; }
+
+    record PasswordRequirement(string Label, bool Met);
+
+    IEnumerable<PasswordRequirement> PasswordRequirements => new[]
+    {
+        new PasswordRequirement("At least 8 characters",          password.Length >= 8),
+        new PasswordRequirement("One uppercase letter (A–Z)",     password.Any(char.IsUpper)),
+        new PasswordRequirement("One lowercase letter (a–z)",     password.Any(char.IsLower)),
+        new PasswordRequirement("One number (0–9)",               password.Any(char.IsDigit)),
+        new PasswordRequirement("One special character (!@#$%&*)", password.Any(c => "!@#$%^&*()_+-=[]{}|;':\",./<>?".Contains(c))),
+    };
+
+    bool PasswordIsValid => PasswordRequirements.All(r => r.Met);
 
     void ToggleProperty(int propId, bool isChecked)
     {

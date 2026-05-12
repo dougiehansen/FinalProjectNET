@@ -193,11 +193,6 @@
         </section>
     }
 
-    <div class="content-card map-card">
-        <h2>Property Locations</h2>
-        <div id="property-map"></div>
-    </div>
-
     <div class="sig-grid">
         <div class="sig-card" id="ecb-rate">
             <div class="stat-label">ECB Interest Rate</div>
@@ -238,6 +233,12 @@
         <div id="rent-algo-breakdown"></div>
     </div>
 
+    <div class="content-card chart-card" style="margin-top:18px;">
+        <h2>Monthly Revenue — Last 12 Months</h2>
+        <p>Rent collected each month against the current expected monthly income. <span style="color:#16a34a;font-weight:600;">Green</span> bars met or exceeded target; <span style="color:#2563eb;font-weight:600;">blue</span> bars were below; <span style="color:#94a3b8;font-weight:600;">grey</span> months have no payments recorded yet.</p>
+        <canvas id="revenue-chart"></canvas>
+    </div>
+
     <div class="two-col-grid" style="margin-top:18px;">
         <div class="content-card chart-card" style="grid-column: 1 / -1;">
             <h2>Rent Comparison — Europe vs Our Portfolio</h2>
@@ -252,6 +253,11 @@
             <canvas id="rent-chart"></canvas>
         </div>
     </div>
+    <div class="content-card map-card" style="margin-top:18px;">
+        <h2>Property Locations</h2>
+        <div id="property-map" style="height:320px;"></div>
+    </div>
+
 </div>
 
 @if (selectedPin is not null)
@@ -310,6 +316,10 @@
     decimal monthlyRevenue;
     decimal totalOutstanding;
     int overdueCount, expiringSoon, pendingSignatures, paymentsThisMonth;
+
+    // Revenue chart data
+    string[] revenueLabels  = [];
+    decimal[] revenueAmounts = [];
 
     int OccupancyPct => totalUnits > 0 ? (int)Math.Round(occupiedUnits * 100.0 / totalUnits) : 0;
 
@@ -381,6 +391,26 @@
                 (allowed == null || allowed.Contains(l.Unit.PropertyId)));
         }
 
+        // Revenue trend — last 12 months
+        var chartStart   = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1).AddMonths(-11);
+        var rawPayments  = await Db.RentPayments
+            .Where(p => p.PaymentDate >= chartStart && (allowed == null || allowed.Contains(p.Lease.Unit.PropertyId)))
+            .Select(p => new { p.PaymentDate, p.Amount })
+            .ToListAsync();
+
+        var labels  = new List<string>();
+        var amounts = new List<decimal>();
+        for (int i = 11; i >= 0; i--)
+        {
+            var m     = DateTime.Today.AddMonths(-i);
+            var start = new DateTime(m.Year, m.Month, 1);
+            var end   = start.AddMonths(1);
+            labels.Add(m.ToString("MMM yy"));
+            amounts.Add(rawPayments.Where(p => p.PaymentDate >= start && p.PaymentDate < end).Sum(p => p.Amount));
+        }
+        revenueLabels  = [.. labels];
+        revenueAmounts = [.. amounts];
+
         pins = await Db.Properties
             .Where(p => p.IsActive && p.Latitude != 0 && (allowed == null || allowed.Contains(p.Id)))
             .Select(p => new PropertyMapPin
@@ -405,6 +435,7 @@
         if (firstRender)
         {
             try { await JS.InvokeVoidAsync("economicSignals.init"); } catch { }
+            try { await JS.InvokeVoidAsync("revenueChart.init", "revenue-chart", revenueLabels, revenueAmounts, monthlyRevenue); } catch { }
             try { await JS.InvokeVoidAsync("rentChart.init", "rent-chart", portfolioAvg); } catch { }
             try
             {

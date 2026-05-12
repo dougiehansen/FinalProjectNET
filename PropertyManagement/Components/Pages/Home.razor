@@ -15,23 +15,122 @@
 <div class="page-wrap">
     <h1 class="page-title">Dashboard</h1>
 
-    <section class="stats-grid g4">
-        <div class="stat-card">
-            <div class="stat-label">Properties</div>
-            <div class="stat-value">@totalProperties</div>
-            <div class="stat-sub">Active properties</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-label">Units</div>
-            <div class="stat-value">@totalUnits</div>
-            <div class="stat-sub">@occupiedUnits occupied</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-label">Active Leases</div>
-            <div class="stat-value">@activeLeases</div>
-            <div class="stat-sub">Current tenants</div>
-        </div>
-    </section>
+    @* Administrator: revenue + occupancy + outstanding + expiry *@
+    @if (IsAdmin)
+    {
+        <section class="stats-grid g4">
+            <div class="stat-card">
+                <div class="stat-label">Monthly Revenue</div>
+                <div class="stat-value" style="color:var(--green)">€@monthlyRevenue.ToString("N0")</div>
+                <div class="stat-sub">@occupiedUnits of @totalUnits units occupied</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Occupancy Rate</div>
+                <div class="stat-value">@OccupancyPct%</div>
+                <div class="stat-sub">@(totalUnits - occupiedUnits) vacant units</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Outstanding Balance</div>
+                <div class="stat-value" style="color:@(totalOutstanding > 0 ? "var(--red)" : "var(--green)")">
+                    €@totalOutstanding.ToString("N0")
+                </div>
+                <div class="stat-sub">@overdueCount @(overdueCount == 1 ? "tenant" : "tenants") overdue</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Expiring Soon</div>
+                <div class="stat-value" style="color:@(expiringSoon > 0 ? "var(--orange, #f59e0b)" : "inherit")">
+                    @expiringSoon
+                </div>
+                <div class="stat-sub">
+                    @(pendingSignatures > 0 ? $"{pendingSignatures} pending signature{(pendingSignatures == 1 ? "" : "s")}" : "leases in next 60 days")
+                </div>
+            </div>
+        </section>
+    }
+
+    @* Property Manager: properties + units + expiring + pending signatures *@
+    else if (IsManager)
+    {
+        <section class="stats-grid g4">
+            <div class="stat-card">
+                <div class="stat-label">Properties</div>
+                <div class="stat-value">@totalProperties</div>
+                <div class="stat-sub">Active properties</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Units</div>
+                <div class="stat-value">@totalUnits</div>
+                <div class="stat-sub">@occupiedUnits occupied · @(totalUnits - occupiedUnits) vacant</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Expiring Soon</div>
+                <div class="stat-value" style="color:@(expiringSoon > 0 ? "var(--orange, #f59e0b)" : "inherit")">
+                    @expiringSoon
+                </div>
+                <div class="stat-sub">leases ending in 60 days</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Pending Signatures</div>
+                <div class="stat-value" style="color:@(pendingSignatures > 0 ? "var(--orange, #f59e0b)" : "inherit")">
+                    @pendingSignatures
+                </div>
+                <div class="stat-sub">awaiting tenant sign-off</div>
+            </div>
+        </section>
+    }
+
+    @* Accounting Team: revenue + outstanding + overdue count + payments this month *@
+    else if (IsAccounting)
+    {
+        <section class="stats-grid g4">
+            <div class="stat-card">
+                <div class="stat-label">Monthly Revenue</div>
+                <div class="stat-value" style="color:var(--green)">€@monthlyRevenue.ToString("N0")</div>
+                <div class="stat-sub">from @occupiedUnits occupied units</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Outstanding Balance</div>
+                <div class="stat-value" style="color:@(totalOutstanding > 0 ? "var(--red)" : "var(--green)")">
+                    €@totalOutstanding.ToString("N0")
+                </div>
+                <div class="stat-sub">across all active leases</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Overdue Tenants</div>
+                <div class="stat-value" style="color:@(overdueCount > 0 ? "var(--red)" : "var(--green)")">
+                    @overdueCount
+                </div>
+                <div class="stat-sub">@(activeLeases - overdueCount) paid up</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Payments This Month</div>
+                <div class="stat-value">@paymentsThisMonth</div>
+                <div class="stat-sub">@DateTime.Today.ToString("MMMM yyyy")</div>
+            </div>
+        </section>
+    }
+
+    @* Fallback (should not occur with current roles) *@
+    else
+    {
+        <section class="stats-grid g4">
+            <div class="stat-card">
+                <div class="stat-label">Properties</div>
+                <div class="stat-value">@totalProperties</div>
+                <div class="stat-sub">Active properties</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Units</div>
+                <div class="stat-value">@totalUnits</div>
+                <div class="stat-sub">@occupiedUnits occupied</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Active Leases</div>
+                <div class="stat-value">@activeLeases</div>
+                <div class="stat-sub">Current tenants</div>
+            </div>
+        </section>
+    }
 
     <div class="content-card map-card">
         <h2>Property Locations</h2>
@@ -141,17 +240,33 @@
 }
 
 @code {
+    // Base stats
     int totalProperties, totalUnits, occupiedUnits, activeLeases;
     decimal portfolioAvg;
+
+    // Role-specific stats
+    string userRole = string.Empty;
+    decimal monthlyRevenue;
+    decimal totalOutstanding;
+    int overdueCount, expiringSoon, pendingSignatures, paymentsThisMonth;
+
+    int OccupancyPct => totalUnits > 0 ? (int)Math.Round(occupiedUnits * 100.0 / totalUnits) : 0;
+
+    bool IsAdmin      => userRole == "Administrator";
+    bool IsManager    => userRole == "PropertyManager";
+    bool IsAccounting => userRole == "AccountingTeam";
+
     List<PropertyMapPin> pins = new();
     PropertyMapPin? selectedPin;
     DotNetObjectReference<Home>? dotNetRef;
 
     protected override async Task OnInitializedAsync()
     {
-        var auth      = await AuthStateProvider.GetAuthenticationStateAsync();
-        var allowed   = await AccessService.GetAllowedIdsAsync(auth.User);
+        var auth    = await AuthStateProvider.GetAuthenticationStateAsync();
+        var allowed = await AccessService.GetAllowedIdsAsync(auth.User);
+        userRole    = auth.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? string.Empty;
 
+        // Base counts (all roles)
         totalProperties = await Db.Properties.CountAsync(p => p.IsActive && (allowed == null || allowed.Contains(p.Id)));
         totalUnits      = await Db.Units.CountAsync(u => u.IsActive && (allowed == null || allowed.Contains(u.PropertyId)));
         occupiedUnits   = await Db.Units.CountAsync(u => u.IsActive && u.IsOccupied && (allowed == null || allowed.Contains(u.PropertyId)));
@@ -161,6 +276,49 @@
         portfolioAvg  = await rentQuery.AnyAsync()
             ? Math.Round(await rentQuery.AverageAsync(u => u.MonthlyRent), 0)
             : 0;
+
+        // Role-specific queries
+        if (IsAdmin || IsAccounting)
+        {
+            monthlyRevenue = await Db.Units
+                .Where(u => u.IsActive && u.IsOccupied && (allowed == null || allowed.Contains(u.PropertyId)))
+                .SumAsync(u => (decimal?)u.MonthlyRent) ?? 0;
+
+            // Outstanding balance: (months active × rent) − total paid, summed across all active leases
+            var today      = DateTime.Today;
+            var leaseStats = await Db.Leases
+                .Where(l => l.Status == LeaseStatus.Active && (allowed == null || allowed.Contains(l.Unit.PropertyId)))
+                .Select(l => new { l.StartDate, l.MonthlyRent, TotalPaid = l.RentPayments.Sum(p => (decimal?)p.Amount) ?? 0 })
+                .ToListAsync();
+
+            foreach (var l in leaseStats)
+            {
+                var months   = (int)Math.Max(1, Math.Floor((today - l.StartDate).TotalDays / 30.44));
+                var balance  = Math.Max(0, months * l.MonthlyRent - l.TotalPaid);
+                totalOutstanding += balance;
+                if (balance > 0) overdueCount++;
+            }
+
+            if (IsAccounting)
+            {
+                var monthStart    = new DateTime(today.Year, today.Month, 1);
+                paymentsThisMonth = await Db.RentPayments
+                    .CountAsync(p => p.PaymentDate >= monthStart && (allowed == null || allowed.Contains(p.Lease.Unit.PropertyId)));
+            }
+        }
+
+        if (IsAdmin || IsManager)
+        {
+            expiringSoon      = await Db.Leases.CountAsync(l =>
+                l.Status == LeaseStatus.Active &&
+                l.EndDate  <= DateTime.Today.AddDays(60) &&
+                (allowed == null || allowed.Contains(l.Unit.PropertyId)));
+
+            pendingSignatures = await Db.Leases.CountAsync(l =>
+                l.Status          == LeaseStatus.Active &&
+                l.SignatureStatus  == SignatureStatus.Pending &&
+                (allowed == null || allowed.Contains(l.Unit.PropertyId)));
+        }
 
         pins = await Db.Properties
             .Where(p => p.IsActive && p.Latitude != 0 && (allowed == null || allowed.Contains(p.Id)))

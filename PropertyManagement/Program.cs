@@ -69,6 +69,8 @@ builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IDocumentService, DocumentService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddScoped<IPropertyAccessService, PropertyAccessService>();
+builder.Services.AddScoped<BankStatementParser>();
+builder.Services.AddScoped<StatementMatcherService>();
 builder.Services.AddSingleton<LeaseNotificationService>();
 builder.Services.AddHostedService<LeaseExpiryWorker>();
 

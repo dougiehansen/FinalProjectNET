@@ -4,13 +4,15 @@ using System.Text;
 namespace PropertyManagement.Services;
 
 /// <summary>
-/// Parses a CSV bank statement into a list of credit transactions.
+/// Parses a bank statement (CSV or TSV) into a list of transactions.
 /// Handles column names and date formats from AIB, BOI, Revolut, and
-/// generic bank exports. Only positive (credit) rows are returned.
+/// generic exports. Supports both single-Amount layouts and separate
+/// Debit/Credit column layouts — amounts are taken from whichever
+/// column is non-empty per row, so both landlord statements (rent as
+/// Credit) and tenant statements (rent as Debit) are handled correctly.
 /// </summary>
 public class BankStatementParser
 {
-    // Supported date formats in priority order
     private static readonly string[] DateFormats =
     [
         "dd/MM/yyyy", "d/MM/yyyy", "dd-MM-yyyy", "yyyy-MM-dd",
@@ -26,17 +28,29 @@ public class BankStatementParser
         if (lines.Length < 2)
             return [];
 
-        var headers = SplitLine(lines[0].TrimEnd('\r'))
+        var headerLine = lines[0].TrimEnd('\r');
+        var separator  = DetectSeparator(headerLine);
+
+        var headers = SplitLine(headerLine, separator)
             .Select(h => h.Trim('"').Trim().ToLowerInvariant())
             .ToArray();
 
         int dateCol   = FindColumn(headers, "date", "value date", "transaction date", "posted date");
-        int amountCol = FindColumn(headers, "credit", "amount", "debit", "value");
+
+        // Separate credit and debit columns (e.g. AIB, BOI format)
+        int creditCol = FindColumn(headers, "credit");
+        int debitCol  = FindColumn(headers, "debit");
+
+        // Single amount column (e.g. Revolut, generic CSV)
+        int amountCol = creditCol >= 0
+            ? creditCol
+            : FindColumn(headers, "amount", "value");
+
         int descCol   = FindColumn(headers, "description", "narrative", "details", "memo", "transaction details");
         int refCol    = FindColumn(headers, "reference", "ref", "transaction id", "transaction ref");
 
-        // Cannot parse without at least date and amount
-        if (dateCol < 0 || amountCol < 0)
+        // Need at least a date and one amount source
+        if (dateCol < 0 || (amountCol < 0 && debitCol < 0))
             return [];
 
         var results = new List<BankTransaction>();
@@ -46,13 +60,18 @@ public class BankStatementParser
             var line = lines[i].TrimEnd('\r');
             if (string.IsNullOrWhiteSpace(line)) continue;
 
-            var cols = SplitLine(line);
-            int maxRequired = Math.Max(dateCol, amountCol);
-            if (cols.Length <= maxRequired) continue;
+            var cols = SplitLine(line, separator);
 
-            if (!TryParseDate(cols[dateCol], out var date))    continue;
-            if (!TryParseAmount(cols[amountCol], out var amount)) continue;
-            if (amount <= 0) continue; // skip debits and zero rows
+            if (!TryGetDate(cols, dateCol, out var date)) continue;
+
+            // Try credit/amount column first; fall back to debit column.
+            // This means both landlord statements (rent arrives as Credit)
+            // and tenant statements (rent leaves as Debit) are captured.
+            decimal amount = 0;
+            if (amountCol >= 0) TryParseAmount(SafeGet(cols, amountCol), out amount);
+            if (amount <= 0 && debitCol >= 0) TryParseAmount(SafeGet(cols, debitCol), out amount);
+
+            if (amount <= 0) continue;
 
             results.Add(new BankTransaction(
                 Date:        date,
@@ -65,7 +84,18 @@ public class BankStatementParser
         return results;
     }
 
-    // --- Helpers ---
+    // ── Helpers ──────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Detects whether the file uses tabs or commas as the delimiter by
+    /// counting occurrences of each in the header row.
+    /// </summary>
+    private static char DetectSeparator(string headerLine)
+    {
+        int tabs   = headerLine.Count(c => c == '\t');
+        int commas = headerLine.Count(c => c == ',');
+        return tabs > commas ? '\t' : ',';
+    }
 
     private static int FindColumn(string[] headers, params string[] candidates)
     {
@@ -74,6 +104,13 @@ public class BankStatementParser
                 if (headers[i].Contains(candidate, StringComparison.OrdinalIgnoreCase))
                     return i;
         return -1;
+    }
+
+    private static bool TryGetDate(string[] cols, int index, out DateTime result)
+    {
+        result = default;
+        if (index < 0 || index >= cols.Length) return false;
+        return TryParseDate(cols[index], out result);
     }
 
     private static bool TryParseDate(string raw, out DateTime result)
@@ -85,7 +122,6 @@ public class BankStatementParser
 
     private static bool TryParseAmount(string raw, out decimal result)
     {
-        // Strip currency symbols, spaces, and thousands separators
         raw = raw.Trim('"').Trim()
                  .Replace("€", "").Replace("$", "").Replace("£", "")
                  .Replace(" ", "").Replace(",", "");
@@ -93,11 +129,17 @@ public class BankStatementParser
     }
 
     /// <summary>
-    /// Splits a CSV line respecting double-quoted fields that may contain commas.
+    /// Splits a line on the given separator. For commas, respects
+    /// double-quoted fields that may contain commas. For tabs, a simple
+    /// split is used since TSV files rarely quote fields.
     /// </summary>
-    public static string[] SplitLine(string line)
+    public static string[] SplitLine(string line, char separator = ',')
     {
-        var fields = new List<string>();
+        if (separator == '\t')
+            return line.Split('\t');
+
+        // Comma-separated: handle quoted fields
+        var fields  = new List<string>();
         var current = new StringBuilder();
         bool inQuotes = false;
 

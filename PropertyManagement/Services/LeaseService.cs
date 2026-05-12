@@ -36,6 +36,16 @@ public class LeaseService : ILeaseService
             .ToListAsync();
 
     /// <inheritdoc/>
+    public async Task<List<Lease>> GetHistoryByUnitAsync(int unitId) =>
+        await _db.Leases
+            .AsNoTracking()
+            .Include(l => l.Tenant)
+            .Include(l => l.RentPayments)
+            .Where(l => l.UnitId == unitId)
+            .OrderByDescending(l => l.StartDate)
+            .ToListAsync();
+
+    /// <inheritdoc/>
     public async Task<Dictionary<int, Lease>> GetActiveLeasesByUnitAsync() =>
         await _db.Leases
             .Include(l => l.Tenant)

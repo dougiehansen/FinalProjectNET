@@ -45,6 +45,12 @@ public interface ILeaseService
     /// </summary>
     Task<decimal> GetOutstandingBalanceAsync(int leaseId);
     Task<List<Lease>> GetByTenantIdAsync(int tenantId);
+
+    /// <summary>
+    /// Returns all leases for a unit ordered by start date descending, with Tenant loaded.
+    /// Used to show occupancy history on the Properties page.
+    /// </summary>
+    Task<List<Lease>> GetHistoryByUnitAsync(int unitId);
     Task<int>     AutoExpireAsync();
     Task<Lease?>  GetByTokenAsync(string token);
     Task          SignAsync(string token, string signedByName);

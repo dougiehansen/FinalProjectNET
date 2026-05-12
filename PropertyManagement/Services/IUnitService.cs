@@ -25,4 +25,9 @@ public interface IUnitService
     /// Occupancy status (IsOccupied) is controlled by LeaseService, not here.
     /// </summary>
     Task UpdateAsync(Unit unit);
+
+    /// <summary>
+    /// Marks a unit as inactive. Only call when the unit has no active lease.
+    /// </summary>
+    Task DeactivateAsync(int unitId);
 }

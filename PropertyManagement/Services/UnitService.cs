@@ -46,4 +46,14 @@ public class UnitService : IUnitService
 
         await _db.SaveChangesAsync();
     }
+
+    /// <inheritdoc/>
+    public async Task DeactivateAsync(int unitId)
+    {
+        var unit = await _db.Units.FindAsync(unitId);
+        if (unit == null) return;
+        unit.IsActive   = false;
+        unit.IsOccupied = false;
+        await _db.SaveChangesAsync();
+    }
 }

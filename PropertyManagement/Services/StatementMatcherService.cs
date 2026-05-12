@@ -38,8 +38,8 @@ public class MatchResult
 /// <summary>
 /// Matches a list of bank transactions against active leases using a
 /// weighted scoring algorithm. Each transaction is scored against every
-/// lease on three criteria: amount proximity, date proximity, and tenant
-/// name presence in the transaction description.
+/// lease on four criteria: amount proximity, date proximity, tenant name,
+/// and unit/property reference in the transaction description.
 /// </summary>
 public class StatementMatcherService
 {
@@ -51,6 +51,8 @@ public class StatementMatcherService
     private const int FullNamePts      = 30; // full tenant name in description
     private const int LastNamePts      = 15; // surname only in description
     private const int FirstNamePts     = 8;  // first name only in description
+    private const int UnitPts          = 12; // unit number in description
+    private const int PropertyPts      = 8;  // property name in description
 
     /// <summary>
     /// Minimum score for a match to be auto-confirmed.
@@ -132,6 +134,22 @@ public class StatementMatcherService
             {
                 score += FirstNamePts;
                 reasons.Add("Tenant first name found in description");
+            }
+
+            // 4 ── Unit number and property name in description
+            var unitNumber   = lease.Unit.UnitNumber.ToLowerInvariant();
+            var propertyName = lease.Unit.Property.Name.ToLowerInvariant();
+
+            if (!string.IsNullOrWhiteSpace(unitNumber) && haystack.Contains(unitNumber))
+            {
+                score += UnitPts;
+                reasons.Add($"Unit number ({lease.Unit.UnitNumber}) found in description");
+            }
+
+            if (!string.IsNullOrWhiteSpace(propertyName) && haystack.Contains(propertyName))
+            {
+                score += PropertyPts;
+                reasons.Add($"Property name found in description");
             }
 
             if (score > bestScore)

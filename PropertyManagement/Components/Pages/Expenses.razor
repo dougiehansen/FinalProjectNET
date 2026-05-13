@@ -1,0 +1,401 @@
+@page "/expenses"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Administrator,PropertyManager,AccountingTeam")]
+@inject IExpenseService ExpenseService
+@inject IPropertyService PropertyService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IPropertyAccessService AccessService
+@using PropertyManagement.Models
+
+<PageTitle>Expenses - PropertyMS</PageTitle>
+
+<div class="page-wrap">
+
+    <div class="page-hdr">
+        <div>
+            <h1>Expenses</h1>
+            <p>@expenses.Count @(expenses.Count == 1 ? "expense" : "expenses") recorded</p>
+        </div>
+        <button class="btn-primary-action" @onclick="OpenAdd">
+            <svg width="14" height="14" fill="none" viewBox="0 0 14 14">
+                <path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            Add Expense
+        </button>
+    </div>
+
+    @if (!string.IsNullOrEmpty(successMsg))
+    {
+        <div class="alert alert-success alert-dismissible">@successMsg
+            <button type="button" class="btn-close" @onclick="() => successMsg = string.Empty"></button>
+        </div>
+    }
+
+    <!-- Summary cards -->
+    @if (!loading)
+    {
+        <div class="stats-grid g3" style="margin-bottom:20px;">
+            <div class="stat-card">
+                <div class="stat-label">This Month</div>
+                <div class="stat-value" style="color:#dc2626;">€@ThisMonth.ToString("N0")</div>
+                <div class="stat-sub">@DateTime.Today.ToString("MMMM yyyy")</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">This Year</div>
+                <div class="stat-value">€@ThisYear.ToString("N0")</div>
+                <div class="stat-sub">@DateTime.Today.Year</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">All Time</div>
+                <div class="stat-value">€@AllTime.ToString("N0")</div>
+                <div class="stat-sub">@expenses.Count entries</div>
+            </div>
+        </div>
+    }
+
+    <!-- Filter bar -->
+    <div class="content-card panel" style="margin-bottom:20px;">
+        <div style="padding:16px 20px;">
+            <div class="field-row c4">
+                <div class="field-group">
+                    <label class="field-label">Property</label>
+                    <select class="field-select" @bind="filterPropertyId" @bind:after="ApplyFilters">
+                        <option value="0">All Properties</option>
+                        @foreach (var p in properties)
+                        {
+                            <option value="@p.Id">@p.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Category</label>
+                    <select class="field-select" @bind="filterCategory" @bind:after="ApplyFilters">
+                        <option value="">All Categories</option>
+                        @foreach (var c in Enum.GetValues<ExpenseCategory>())
+                        {
+                            <option value="@c">@c</option>
+                        }
+                    </select>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">From</label>
+                    <input type="date" class="field-input" @bind="filterFrom" @bind:after="ApplyFilters" />
+                </div>
+                <div class="field-group">
+                    <label class="field-label">To</label>
+                    <input type="date" class="field-input" @bind="filterTo" @bind:after="ApplyFilters" />
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (loading)
+    {
+        <div style="display:flex;justify-content:center;padding:40px;">
+            <div class="spinner"></div>
+        </div>
+    }
+    else if (!expenses.Any())
+    {
+        <div class="empty-state">
+            <div class="empty-icon">💸</div>
+            <h3>No expenses yet</h3>
+            <p>Add your first expense to start tracking costs.</p>
+        </div>
+    }
+    else
+    {
+        <div class="content-card">
+            <div class="table-scroll">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Property</th>
+                            <th>Category</th>
+                            <th>Description</th>
+                            <th>Vendor</th>
+                            <th>Amount</th>
+                            <th style="text-align:right;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var e in expenses)
+                        {
+                            <tr>
+                                <td>@e.Date.ToString("dd MMM yyyy")</td>
+                                <td>@e.Property.Name</td>
+                                <td><span class="status-badge active" style="background:@CategoryColour(e.Category)20;color:@CategoryColour(e.Category);">@e.Category</span></td>
+                                <td class="fw">@e.Description</td>
+                                <td style="color:var(--grey);">@(e.Vendor ?? "—")</td>
+                                <td style="font-weight:700;color:#dc2626;">€@e.Amount.ToString("N2")</td>
+                                <td style="text-align:right;">
+                                    <button class="btn-icon" title="Edit" @onclick="() => OpenEdit(e)">
+                                        <svg width="14" height="14" fill="none" viewBox="0 0 14 14"><path d="M9.5 2.5l2 2-7 7H2.5v-2l7-7z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+                                    </button>
+                                    <button class="btn-icon btn-icon-danger" title="Delete" @onclick="() => ConfirmDelete(e)">
+                                        <svg width="14" height="14" fill="none" viewBox="0 0 14 14"><path d="M2 3.5h10M5.5 3.5V2h3v1.5M4 3.5l.5 8h5l.5-8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="5" style="font-weight:700;text-align:right;padding-right:12px;">Total</td>
+                            <td style="font-weight:700;color:#dc2626;">€@expenses.Sum(e => e.Amount).ToString("N2")</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    }
+
+</div>
+
+<!-- Add / Edit modal -->
+@if (showForm)
+{
+    <div class="modal-overlay" @onclick="CloseForm"></div>
+    <div class="modal-sheet" @onclick="CloseForm">
+        <div class="modal-box" style="max-width:520px;" @onclick:stopPropagation>
+            <div class="modal-blue-hdr">
+                <div><h3>@(editId == 0 ? "Add Expense" : "Edit Expense")</h3></div>
+                <button class="modal-blue-close" @onclick="CloseForm">✕</button>
+            </div>
+            <div class="modal-body-inner">
+                @if (!string.IsNullOrEmpty(formError))
+                {
+                    <div class="alert alert-danger" style="margin-bottom:12px;">@formError</div>
+                }
+                <div class="field-row c2">
+                    <div class="field-group">
+                        <label class="field-label">Property <span style="color:red">*</span></label>
+                        <select class="field-select" @bind="form.PropertyId">
+                            <option value="0">— select —</option>
+                            @foreach (var p in properties)
+                            {
+                                <option value="@p.Id">@p.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="field-group">
+                        <label class="field-label">Category <span style="color:red">*</span></label>
+                        <select class="field-select" @bind="form.Category">
+                            @foreach (var c in Enum.GetValues<ExpenseCategory>())
+                            {
+                                <option value="@c">@c</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+                <div class="field-row c2">
+                    <div class="field-group">
+                        <label class="field-label">Date <span style="color:red">*</span></label>
+                        <input type="date" class="field-input" @bind="form.Date" />
+                    </div>
+                    <div class="field-group">
+                        <label class="field-label">Amount (€) <span style="color:red">*</span></label>
+                        <input type="number" class="field-input" step="0.01" min="0" @bind="form.Amount" />
+                    </div>
+                </div>
+                <div class="field-group" style="margin-top:10px;">
+                    <label class="field-label">Description <span style="color:red">*</span></label>
+                    <input type="text" class="field-input" maxlength="300" @bind="form.Description" />
+                </div>
+                <div class="field-group" style="margin-top:10px;">
+                    <label class="field-label">Vendor</label>
+                    <input type="text" class="field-input" maxlength="200" @bind="form.Vendor" placeholder="Optional" />
+                </div>
+                <div class="field-group" style="margin-top:10px;">
+                    <label class="field-label">Notes</label>
+                    <textarea class="field-input" rows="2" maxlength="500" @bind="form.Notes" placeholder="Optional"></textarea>
+                </div>
+            </div>
+            <div style="padding:16px 24px;display:flex;gap:8px;justify-content:flex-end;border-top:1px solid #e5e7eb;">
+                <button class="btn-cancel" @onclick="CloseForm">Cancel</button>
+                <button class="btn-save" @onclick="SaveForm" disabled="@saving">@(saving ? "Saving…" : "Save")</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Delete confirm modal -->
+@if (deleteTarget != null)
+{
+    <div class="modal-overlay" @onclick="() => deleteTarget = null"></div>
+    <div class="modal-sheet" @onclick="() => deleteTarget = null">
+        <div class="modal-box" style="max-width:400px;" @onclick:stopPropagation>
+            <div class="modal-blue-hdr" style="background:#dc2626;">
+                <div><h3>Delete Expense</h3></div>
+                <button class="modal-blue-close" @onclick="() => deleteTarget = null">✕</button>
+            </div>
+            <div class="modal-body-inner">
+                <p>Delete <strong>@deleteTarget.Description</strong> (€@deleteTarget.Amount.ToString("N2")) from @deleteTarget.Date.ToString("dd MMM yyyy")?</p>
+                <p style="color:#dc2626;font-size:0.85rem;">This cannot be undone.</p>
+            </div>
+            <div style="padding:16px 24px;display:flex;gap:8px;justify-content:flex-end;border-top:1px solid #e5e7eb;">
+                <button class="btn-cancel" @onclick="() => deleteTarget = null">Cancel</button>
+                <button class="btn-danger" @onclick="DoDelete">Delete</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    bool loading = true, saving;
+    string successMsg = string.Empty;
+    string formError  = string.Empty;
+    bool showForm;
+    int editId;
+
+    List<Expense>  expenses   = new();
+    List<Property> properties = new();
+    Expense?       deleteTarget;
+
+    // Filter state
+    int               filterPropertyId;
+    string            filterCategory = string.Empty;
+    DateTime?         filterFrom;
+    DateTime?         filterTo;
+
+    // Form model
+    ExpenseForm form = new();
+
+    decimal ThisMonth => expenses.Where(e => e.Date.Year == DateTime.Today.Year && e.Date.Month == DateTime.Today.Month).Sum(e => e.Amount);
+    decimal ThisYear  => expenses.Where(e => e.Date.Year == DateTime.Today.Year).Sum(e => e.Amount);
+    decimal AllTime   => expenses.Sum(e => e.Amount);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth       = await AuthStateProvider.GetAuthenticationStateAsync();
+        var allowedIds = await AccessService.GetAllowedIdsAsync(auth.User);
+        var all        = await PropertyService.GetAllAsync();
+        properties     = allowedIds == null ? all : all.Where(p => allowedIds.Contains(p.Id)).ToList();
+        await LoadExpenses();
+    }
+
+    async Task LoadExpenses()
+    {
+        loading = true;
+        var cat = Enum.TryParse<ExpenseCategory>(filterCategory, out var c) ? (ExpenseCategory?)c : null;
+        expenses = await ExpenseService.GetAllAsync(filterPropertyId > 0 ? filterPropertyId : null, cat, filterFrom, filterTo);
+        loading = false;
+    }
+
+    Task ApplyFilters() => LoadExpenses();
+
+    void OpenAdd()
+    {
+        editId   = 0;
+        form     = new ExpenseForm { Date = DateTime.Today };
+        formError = string.Empty;
+        showForm = true;
+    }
+
+    void OpenEdit(Expense e)
+    {
+        editId = e.Id;
+        form = new ExpenseForm
+        {
+            PropertyId  = e.PropertyId,
+            Category    = e.Category,
+            Description = e.Description,
+            Amount      = e.Amount,
+            Date        = e.Date,
+            Vendor      = e.Vendor,
+            Notes       = e.Notes
+        };
+        formError = string.Empty;
+        showForm  = true;
+    }
+
+    void CloseForm()
+    {
+        showForm  = false;
+        formError = string.Empty;
+    }
+
+    async Task SaveForm()
+    {
+        formError = string.Empty;
+        if (form.PropertyId == 0)      { formError = "Please select a property.";     return; }
+        if (string.IsNullOrWhiteSpace(form.Description)) { formError = "Description is required."; return; }
+        if (form.Amount <= 0)          { formError = "Amount must be greater than 0."; return; }
+
+        saving = true;
+        var auth   = await AuthStateProvider.GetAuthenticationStateAsync();
+        var userId = int.TryParse(auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var uid) ? uid : 0;
+
+        if (editId == 0)
+        {
+            await ExpenseService.CreateAsync(new Expense
+            {
+                PropertyId      = form.PropertyId,
+                Category        = form.Category,
+                Description     = form.Description,
+                Amount          = form.Amount,
+                Date            = form.Date,
+                Vendor          = string.IsNullOrWhiteSpace(form.Vendor) ? null : form.Vendor,
+                Notes           = string.IsNullOrWhiteSpace(form.Notes)  ? null : form.Notes,
+                CreatedByUserId = userId
+            });
+            successMsg = "Expense added.";
+        }
+        else
+        {
+            var existing = await ExpenseService.GetByIdAsync(editId);
+            if (existing != null)
+            {
+                existing.PropertyId  = form.PropertyId;
+                existing.Category    = form.Category;
+                existing.Description = form.Description;
+                existing.Amount      = form.Amount;
+                existing.Date        = form.Date;
+                existing.Vendor      = string.IsNullOrWhiteSpace(form.Vendor) ? null : form.Vendor;
+                existing.Notes       = string.IsNullOrWhiteSpace(form.Notes)  ? null : form.Notes;
+                await ExpenseService.UpdateAsync(existing);
+            }
+            successMsg = "Expense updated.";
+        }
+
+        saving   = false;
+        showForm = false;
+        await LoadExpenses();
+    }
+
+    void ConfirmDelete(Expense e) => deleteTarget = e;
+
+    async Task DoDelete()
+    {
+        if (deleteTarget == null) return;
+        await ExpenseService.DeleteAsync(deleteTarget.Id);
+        successMsg   = "Expense deleted.";
+        deleteTarget = null;
+        await LoadExpenses();
+    }
+
+    static string CategoryColour(ExpenseCategory cat) => cat switch
+    {
+        ExpenseCategory.Maintenance  => "#f59e0b",
+        ExpenseCategory.Repairs      => "#ef4444",
+        ExpenseCategory.Utilities    => "#3b82f6",
+        ExpenseCategory.Insurance    => "#8b5cf6",
+        ExpenseCategory.ManagementFee => "#06b6d4",
+        ExpenseCategory.Taxes        => "#64748b",
+        ExpenseCategory.Cleaning     => "#10b981",
+        ExpenseCategory.Legal        => "#f97316",
+        _                            => "#6b7280"
+    };
+
+    class ExpenseForm
+    {
+        public int             PropertyId  { get; set; }
+        public ExpenseCategory Category    { get; set; } = ExpenseCategory.Maintenance;
+        public string          Description { get; set; } = string.Empty;
+        public decimal         Amount      { get; set; }
+        public DateTime        Date        { get; set; } = DateTime.Today;
+        public string?         Vendor      { get; set; }
+        public string?         Notes       { get; set; }
+    }
+}

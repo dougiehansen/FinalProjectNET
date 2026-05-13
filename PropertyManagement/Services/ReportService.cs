@@ -107,7 +107,47 @@ public class ReportService : IReportService
             .ToList();
     }
 
-    public async Task<byte[]> ExportToExcelAsync(string reportType, int propertyId, DateTime? asOf = null)
+    public async Task<List<ProfitLossRow>> GetProfitLossAsync(int propertyId, DateTime from, DateTime to)
+    {
+        var toEnd = to.Date.AddDays(1).AddTicks(-1);
+
+        var revenueQuery = _db.RentPayments
+            .Include(p => p.Lease).ThenInclude(l => l.Unit).ThenInclude(u => u.Property)
+            .Where(p => p.PaymentDate >= from && p.PaymentDate <= toEnd);
+
+        if (propertyId > 0)
+            revenueQuery = revenueQuery.Where(p => p.Lease.Unit.PropertyId == propertyId);
+
+        var payments = await revenueQuery.ToListAsync();
+
+        var expenseQuery = _db.Expenses
+            .Include(e => e.Property)
+            .Where(e => e.Date >= from && e.Date <= toEnd);
+
+        if (propertyId > 0)
+            expenseQuery = expenseQuery.Where(e => e.PropertyId == propertyId);
+
+        var expenses = await expenseQuery.ToListAsync();
+
+        var propertyNames = payments.Select(p => p.Lease.Unit.Property.Name)
+            .Concat(expenses.Select(e => e.Property.Name))
+            .Distinct()
+            .OrderBy(n => n)
+            .ToList();
+
+        return propertyNames.Select(name => new ProfitLossRow
+        {
+            PropertyName      = name,
+            RentRevenue       = payments.Where(p => p.Lease.Unit.Property.Name == name).Sum(p => p.Amount),
+            TotalExpenses     = expenses.Where(e => e.Property.Name == name).Sum(e => e.Amount),
+            ExpenseByCategory = expenses
+                .Where(e => e.Property.Name == name)
+                .GroupBy(e => e.Category)
+                .ToDictionary(g => g.Key, g => g.Sum(e => e.Amount))
+        }).ToList();
+    }
+
+    public async Task<byte[]> ExportToExcelAsync(string reportType, int propertyId, DateTime? asOf = null, DateTime? plFrom = null, DateTime? plTo = null)
     {
         using var wb = new XLWorkbook();
 
@@ -170,6 +210,35 @@ public class ReportService : IReportService
                     ws.Cell(row, 5).Value = (double)r.OutstandingBalance;
                     ws.Cell(row, 6).Value = r.LeaseEnd.ToString("dd/MM/yyyy");
                 }
+                ws.Columns().AdjustToContents();
+                break;
+            }
+            case "ProfitLoss":
+            {
+                var from = plFrom ?? new DateTime(DateTime.Today.Year, 1, 1);
+                var to   = plTo   ?? DateTime.Today;
+                var rows = await GetProfitLossAsync(propertyId, from, to);
+                var ws   = wb.AddWorksheet("Profit & Loss");
+                string[] headers = ["Property", "Rent Revenue (€)", "Total Expenses (€)", "Net Income (€)"];
+                WriteHeaders(ws, headers);
+                for (int i = 0; i < rows.Count; i++)
+                {
+                    var r = rows[i]; int row = i + 2;
+                    ws.Cell(row, 1).Value = r.PropertyName;
+                    ws.Cell(row, 2).Value = (double)r.RentRevenue;
+                    ws.Cell(row, 3).Value = (double)r.TotalExpenses;
+                    ws.Cell(row, 4).Value = (double)r.NetIncome;
+                    if (r.NetIncome < 0)
+                        ws.Cell(row, 4).Style.Font.FontColor = XLColor.Red;
+                }
+                // Totals row
+                int totRow = rows.Count + 2;
+                ws.Cell(totRow, 1).Value = "TOTAL";
+                ws.Cell(totRow, 1).Style.Font.Bold = true;
+                ws.Cell(totRow, 2).Value = (double)rows.Sum(r => r.RentRevenue);
+                ws.Cell(totRow, 3).Value = (double)rows.Sum(r => r.TotalExpenses);
+                ws.Cell(totRow, 4).Value = (double)rows.Sum(r => r.NetIncome);
+                for (int c = 1; c <= 4; c++) ws.Cell(totRow, c).Style.Font.Bold = true;
                 ws.Columns().AdjustToContents();
                 break;
             }

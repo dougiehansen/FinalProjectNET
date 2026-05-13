@@ -37,10 +37,20 @@ public class OutstandingPaymentRow
     public DateTime LeaseEnd            { get; set; }
 }
 
+public class ProfitLossRow
+{
+    public string  PropertyName  { get; set; } = string.Empty;
+    public decimal RentRevenue   { get; set; }
+    public decimal TotalExpenses { get; set; }
+    public decimal NetIncome     => RentRevenue - TotalExpenses;
+    public Dictionary<ExpenseCategory, decimal> ExpenseByCategory { get; set; } = new();
+}
+
 public interface IReportService
 {
     Task<List<OccupancyRow>>          GetOccupancySummaryAsync(int propertyId, DateTime? asOf = null);
     Task<List<RentRollRow>>           GetRentRollAsync(int propertyId, DateTime? asOf = null);
     Task<List<OutstandingPaymentRow>> GetOutstandingPaymentsAsync(int propertyId, DateTime? asOf = null);
-    Task<byte[]>                      ExportToExcelAsync(string reportType, int propertyId, DateTime? asOf = null);
+    Task<List<ProfitLossRow>>         GetProfitLossAsync(int propertyId, DateTime from, DateTime to);
+    Task<byte[]>                      ExportToExcelAsync(string reportType, int propertyId, DateTime? asOf = null, DateTime? plFrom = null, DateTime? plTo = null);
 }

@@ -28,6 +28,7 @@
                         <option value="OccupancySummary">Occupancy Summary</option>
                         <option value="RentRoll">Rent Roll</option>
                         <option value="OutstandingPayments">Outstanding Payments</option>
+                        <option value="ProfitLoss">Profit &amp; Loss</option>
                     </select>
                 </div>
                 <div class="field-group">
@@ -40,10 +41,24 @@
                         }
                     </select>
                 </div>
-                <div class="field-group">
-                    <label class="field-label">As of Date</label>
-                    <input type="date" class="field-input" @bind="asOfDate" max="@DateTime.Today.ToString("yyyy-MM-dd")" />
-                </div>
+                @if (selectedReport == "ProfitLoss")
+                {
+                    <div class="field-group">
+                        <label class="field-label">Period From</label>
+                        <input type="date" class="field-input" @bind="plFrom" max="@DateTime.Today.ToString("yyyy-MM-dd")" />
+                    </div>
+                    <div class="field-group">
+                        <label class="field-label">Period To</label>
+                        <input type="date" class="field-input" @bind="plTo" max="@DateTime.Today.ToString("yyyy-MM-dd")" />
+                    </div>
+                }
+                else
+                {
+                    <div class="field-group">
+                        <label class="field-label">As of Date</label>
+                        <input type="date" class="field-input" @bind="asOfDate" max="@DateTime.Today.ToString("yyyy-MM-dd")" />
+                    </div>
+                }
             </div>
             <div style="display:flex;gap:8px;">
                 <button class="btn-save" @onclick="RunReport">Generate</button>
@@ -253,6 +268,84 @@
             }
         }
 
+        <!-- Profit & Loss -->
+        @if (selectedReport == "ProfitLoss" && profitLossRows != null)
+        {
+            var totalRevenue  = profitLossRows.Sum(r => r.RentRevenue);
+            var totalExpenses = profitLossRows.Sum(r => r.TotalExpenses);
+            var netIncome     = totalRevenue - totalExpenses;
+            <div class="stats-grid g3" style="margin-bottom:20px;">
+                <div class="stat-card">
+                    <div class="stat-label">Rent Revenue</div>
+                    <div class="stat-value" style="color:#16a34a;">€@totalRevenue.ToString("N0")</div>
+                    <div class="stat-sub">collected in period</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Total Expenses</div>
+                    <div class="stat-value" style="color:#dc2626;">€@totalExpenses.ToString("N0")</div>
+                    <div class="stat-sub">across all categories</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Net Income</div>
+                    <div class="stat-value" style="color:@(netIncome >= 0 ? "#16a34a" : "#dc2626");">€@netIncome.ToString("N0")</div>
+                    <div class="stat-sub">@(netIncome >= 0 ? "profit" : "loss")</div>
+                </div>
+            </div>
+            @if (!profitLossRows.Any())
+            {
+                <div class="empty-state">
+                    <div class="empty-icon">📊</div>
+                    <h3>No data for this period</h3>
+                    <p>No rent payments or expenses found between @plFrom.ToString("dd MMM yyyy") and @plTo.ToString("dd MMM yyyy").</p>
+                </div>
+            }
+            else
+            {
+                <div class="content-card">
+                    <table class="report-table">
+                        <thead>
+                            <tr>
+                                <th>Property</th>
+                                <th>Rent Revenue</th>
+                                <th>Total Expenses</th>
+                                <th>Net Income</th>
+                                <th>Margin</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var r in profitLossRows)
+                            {
+                                var margin = r.RentRevenue > 0 ? (int)Math.Round(r.NetIncome / r.RentRevenue * 100) : 0;
+                                <tr>
+                                    <td class="fw">@r.PropertyName</td>
+                                    <td style="color:#16a34a;font-weight:600;">€@r.RentRevenue.ToString("N0")</td>
+                                    <td style="color:#dc2626;">€@r.TotalExpenses.ToString("N0")</td>
+                                    <td style="font-weight:700;color:@(r.NetIncome >= 0 ? "#16a34a" : "#dc2626");">€@r.NetIncome.ToString("N0")</td>
+                                    <td>
+                                        <div style="display:flex;align-items:center;gap:8px;">
+                                            <div class="occ-track" style="width:80px;">
+                                                <div class="occ-fill" style="width:@(Math.Max(0, Math.Min(100, margin)))%;background:@(margin >= 0 ? "#16a34a" : "#dc2626");"></div>
+                                            </div>
+                                            <span style="color:@(margin >= 0 ? "#16a34a" : "#dc2626");">@margin%</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                        <tfoot>
+                            <tr style="font-weight:700;border-top:2px solid #e5e7eb;">
+                                <td>Total</td>
+                                <td style="color:#16a34a;">€@totalRevenue.ToString("N0")</td>
+                                <td style="color:#dc2626;">€@totalExpenses.ToString("N0")</td>
+                                <td style="color:@(netIncome >= 0 ? "#16a34a" : "#dc2626");">€@netIncome.ToString("N0")</td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            }
+        }
+
     }
 
 </div>
@@ -262,11 +355,14 @@
     string selectedReport = "OccupancySummary";
     int selectedPropertyId;
     DateTime asOfDate = DateTime.Today;
+    DateTime plFrom   = new DateTime(DateTime.Today.Year, 1, 1);
+    DateTime plTo     = DateTime.Today;
     List<Property> properties = new();
 
     List<OccupancyRow>?          occupancyRows;
     List<RentRollRow>?           rentRollRows;
     List<OutstandingPaymentRow>? outstandingRows;
+    List<ProfitLossRow>?         profitLossRows;
 
     protected override async Task OnInitializedAsync()
     {
@@ -282,6 +378,7 @@
         occupancyRows   = null;
         rentRollRows    = null;
         outstandingRows = null;
+        profitLossRows  = null;
 
         var queryDate = asOfDate == DateTime.Today ? (DateTime?)null : asOfDate;
 
@@ -296,6 +393,9 @@
             case "OutstandingPayments":
                 outstandingRows = await ReportService.GetOutstandingPaymentsAsync(selectedPropertyId, queryDate);
                 break;
+            case "ProfitLoss":
+                profitLossRows = await ReportService.GetProfitLossAsync(selectedPropertyId, plFrom, plTo);
+                break;
         }
 
         loading = false;
@@ -306,9 +406,11 @@
     {
         exporting = true;
         var queryDate = asOfDate == DateTime.Today ? (DateTime?)null : asOfDate;
-        var bytes     = await ReportService.ExportToExcelAsync(selectedReport, selectedPropertyId, queryDate);
+        var bytes     = await ReportService.ExportToExcelAsync(selectedReport, selectedPropertyId, queryDate, plFrom, plTo);
         var base64    = Convert.ToBase64String(bytes);
-        var filename  = $"{selectedReport}_{asOfDate:yyyyMMdd}.xlsx";
+        var filename  = selectedReport == "ProfitLoss"
+            ? $"ProfitLoss_{plFrom:yyyyMMdd}_to_{plTo:yyyyMMdd}.xlsx"
+            : $"{selectedReport}_{asOfDate:yyyyMMdd}.xlsx";
         await JS.InvokeVoidAsync("downloadFile", filename, base64);
         exporting = false;
     }

@@ -55,6 +55,23 @@ public static class DbInitializer
             await cmd.ExecuteNonQueryAsync();
         }
 
+        using (var cmd = conn.CreateCommand())
+        {
+            cmd.CommandText = @"CREATE TABLE IF NOT EXISTS Expenses (
+                Id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                PropertyId       INTEGER NOT NULL REFERENCES Properties(Id),
+                Category         INTEGER NOT NULL DEFAULT 0,
+                Description      TEXT    NOT NULL,
+                Amount           REAL    NOT NULL DEFAULT 0,
+                Date             TEXT    NOT NULL,
+                Vendor           TEXT    NULL,
+                Notes            TEXT    NULL,
+                CreatedAt        TEXT    NOT NULL,
+                CreatedByUserId  INTEGER NOT NULL DEFAULT 0
+            )";
+            await cmd.ExecuteNonQueryAsync();
+        }
+
         await conn.CloseAsync();
 
         if (db.Users.Any()) return;

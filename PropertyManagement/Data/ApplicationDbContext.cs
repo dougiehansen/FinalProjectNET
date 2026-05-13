@@ -13,7 +13,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<Tenant> Tenants { get; set; }
     public DbSet<Lease> Leases { get; set; }
     public DbSet<RentPayment> RentPayments { get; set; }
-    public DbSet<AuditLog> AuditLogs { get; set; }
+    public DbSet<Expense>     Expenses     { get; set; }
+    public DbSet<AuditLog>    AuditLogs    { get; set; }
     public DbSet<UserPropertyAssignment> UserPropertyAssignments { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

@@ -21,3 +21,16 @@ public enum PaymentMethod
     Cheque,
     CreditCard
 }
+
+public enum ExpenseCategory
+{
+    Maintenance,
+    Repairs,
+    Utilities,
+    Insurance,
+    ManagementFee,
+    Taxes,
+    Cleaning,
+    Legal,
+    Other
+}

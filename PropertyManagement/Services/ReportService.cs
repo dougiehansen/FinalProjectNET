@@ -11,38 +11,47 @@ public class ReportService : IReportService
 
     public ReportService(ApplicationDbContext db) => _db = db;
 
-    public async Task<List<OccupancyRow>> GetOccupancySummaryAsync(int propertyId)
+    public async Task<List<OccupancyRow>> GetOccupancySummaryAsync(int propertyId, DateTime? asOf = null)
     {
-        var query = _db.Units
+        var date = asOf?.Date ?? DateTime.Today;
+
+        var unitsQuery = _db.Units
             .Include(u => u.Property)
+            .Include(u => u.Leases)
             .Where(u => u.IsActive && u.Property.IsActive);
 
         if (propertyId > 0)
-            query = query.Where(u => u.PropertyId == propertyId);
+            unitsQuery = unitsQuery.Where(u => u.PropertyId == propertyId);
 
-        var units = await query.ToListAsync();
+        var units = await unitsQuery.ToListAsync();
 
         return units
             .GroupBy(u => u.Property)
-            .Select(g => new OccupancyRow
+            .Select(g =>
             {
-                PropertyName     = g.Key.Name,
-                PropertyCity     = string.IsNullOrEmpty(g.Key.City) ? g.Key.State : g.Key.City,
-                TotalUnits       = g.Count(),
-                OccupiedUnits    = g.Count(u => u.IsOccupied),
-                PotentialRevenue = g.Sum(u => u.MonthlyRent),
-                ActualRevenue    = g.Where(u => u.IsOccupied).Sum(u => u.MonthlyRent)
+                var occupied = g.Where(u => u.Leases.Any(l => l.StartDate <= date && l.EndDate >= date)).ToList();
+                return new OccupancyRow
+                {
+                    PropertyName     = g.Key.Name,
+                    PropertyCity     = string.IsNullOrEmpty(g.Key.City) ? g.Key.State : g.Key.City,
+                    TotalUnits       = g.Count(),
+                    OccupiedUnits    = occupied.Count,
+                    PotentialRevenue = g.Sum(u => u.MonthlyRent),
+                    ActualRevenue    = occupied.Sum(u => u.MonthlyRent)
+                };
             })
             .OrderBy(r => r.PropertyName)
             .ToList();
     }
 
-    public async Task<List<RentRollRow>> GetRentRollAsync(int propertyId)
+    public async Task<List<RentRollRow>> GetRentRollAsync(int propertyId, DateTime? asOf = null)
     {
+        var date = asOf?.Date ?? DateTime.Today;
+
         var query = _db.Leases
             .Include(l => l.Tenant)
             .Include(l => l.Unit).ThenInclude(u => u.Property)
-            .Where(l => l.Status == LeaseStatus.Active);
+            .Where(l => l.StartDate <= date && l.EndDate >= date);
 
         if (propertyId > 0)
             query = query.Where(l => l.Unit.PropertyId == propertyId);
@@ -57,17 +66,20 @@ public class ReportService : IReportService
             MonthlyRent  = l.MonthlyRent,
             LeaseStart   = l.StartDate,
             LeaseEnd     = l.EndDate,
-            Status       = l.Status
+            Status       = l.Status,
+            AsOfDate     = date
         }).ToList();
     }
 
-    public async Task<List<OutstandingPaymentRow>> GetOutstandingPaymentsAsync(int propertyId)
+    public async Task<List<OutstandingPaymentRow>> GetOutstandingPaymentsAsync(int propertyId, DateTime? asOf = null)
     {
+        var date = asOf?.Date ?? DateTime.Today;
+
         var query = _db.Leases
             .Include(l => l.Tenant)
             .Include(l => l.Unit).ThenInclude(u => u.Property)
             .Include(l => l.RentPayments)
-            .Where(l => l.Status == LeaseStatus.Active);
+            .Where(l => l.StartDate <= date && l.EndDate >= date);
 
         if (propertyId > 0)
             query = query.Where(l => l.Unit.PropertyId == propertyId);
@@ -75,28 +87,27 @@ public class ReportService : IReportService
         var leases = await query.ToListAsync();
 
         return leases
-            .Select(l => new
+            .Select(l =>
             {
-                Lease   = l,
-                Balance = l.RentPayments.Any()
-                    ? l.RentPayments.OrderByDescending(p => p.PaymentDate).First().OutstandingBalance
-                    : l.MonthlyRent
+                var months    = (int)Math.Max(1, Math.Floor((date - l.StartDate).TotalDays / 30.44));
+                var totalPaid = l.RentPayments.Where(p => p.PaymentDate <= date).Sum(p => p.Amount);
+                var balance   = Math.Max(0, months * l.MonthlyRent - totalPaid);
+                return new OutstandingPaymentRow
+                {
+                    TenantName         = $"{l.Tenant.FirstName} {l.Tenant.LastName}",
+                    PropertyName       = l.Unit.Property.Name,
+                    UnitNumber         = l.Unit.UnitNumber,
+                    MonthlyRent        = l.MonthlyRent,
+                    OutstandingBalance = balance,
+                    LeaseEnd           = l.EndDate
+                };
             })
-            .Where(x => x.Balance > 0)
-            .Select(x => new OutstandingPaymentRow
-            {
-                TenantName         = $"{x.Lease.Tenant.FirstName} {x.Lease.Tenant.LastName}",
-                PropertyName       = x.Lease.Unit.Property.Name,
-                UnitNumber         = x.Lease.Unit.UnitNumber,
-                MonthlyRent        = x.Lease.MonthlyRent,
-                OutstandingBalance = x.Balance,
-                LeaseEnd           = x.Lease.EndDate
-            })
+            .Where(r => r.OutstandingBalance > 0)
             .OrderByDescending(r => r.OutstandingBalance)
             .ToList();
     }
 
-    public async Task<byte[]> ExportToExcelAsync(string reportType, int propertyId)
+    public async Task<byte[]> ExportToExcelAsync(string reportType, int propertyId, DateTime? asOf = null)
     {
         using var wb = new XLWorkbook();
 
@@ -104,7 +115,7 @@ public class ReportService : IReportService
         {
             case "OccupancySummary":
             {
-                var rows = await GetOccupancySummaryAsync(propertyId);
+                var rows = await GetOccupancySummaryAsync(propertyId, asOf);
                 var ws   = wb.AddWorksheet("Occupancy Summary");
                 string[] headers = ["Property", "City", "Total Units", "Occupied", "Vacant", "Occupancy %", "Actual Revenue (€)", "Potential Revenue (€)"];
                 WriteHeaders(ws, headers);
@@ -125,7 +136,7 @@ public class ReportService : IReportService
             }
             case "RentRoll":
             {
-                var rows = await GetRentRollAsync(propertyId);
+                var rows = await GetRentRollAsync(propertyId, asOf);
                 var ws   = wb.AddWorksheet("Rent Roll");
                 string[] headers = ["Property", "Unit", "Tenant", "Monthly Rent (€)", "Lease Start", "Lease End", "Days Left"];
                 WriteHeaders(ws, headers);
@@ -145,7 +156,7 @@ public class ReportService : IReportService
             }
             case "OutstandingPayments":
             {
-                var rows = await GetOutstandingPaymentsAsync(propertyId);
+                var rows = await GetOutstandingPaymentsAsync(propertyId, asOf);
                 var ws   = wb.AddWorksheet("Outstanding Payments");
                 string[] headers = ["Tenant", "Property", "Unit", "Monthly Rent (€)", "Outstanding Balance (€)", "Lease End"];
                 WriteHeaders(ws, headers);

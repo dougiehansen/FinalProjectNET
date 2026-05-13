@@ -21,7 +21,7 @@
     <!-- Filter Bar -->
     <div class="content-card panel" style="margin-bottom:20px;">
         <div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px;">
-            <div class="field-row c2">
+            <div class="field-row c3">
                 <div class="field-group">
                     <label class="field-label">Report Type</label>
                     <select class="field-select" @bind="selectedReport">
@@ -39,6 +39,10 @@
                             <option value="@p.Id">@p.Name</option>
                         }
                     </select>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">As of Date</label>
+                    <input type="date" class="field-input" @bind="asOfDate" max="@DateTime.Today.ToString("yyyy-MM-dd")" />
                 </div>
             </div>
             <div style="display:flex;gap:8px;">
@@ -257,6 +261,7 @@
     bool loading, hasRun, exporting;
     string selectedReport = "OccupancySummary";
     int selectedPropertyId;
+    DateTime asOfDate = DateTime.Today;
     List<Property> properties = new();
 
     List<OccupancyRow>?          occupancyRows;
@@ -278,16 +283,18 @@
         rentRollRows    = null;
         outstandingRows = null;
 
+        var queryDate = asOfDate == DateTime.Today ? (DateTime?)null : asOfDate;
+
         switch (selectedReport)
         {
             case "OccupancySummary":
-                occupancyRows = await ReportService.GetOccupancySummaryAsync(selectedPropertyId);
+                occupancyRows = await ReportService.GetOccupancySummaryAsync(selectedPropertyId, queryDate);
                 break;
             case "RentRoll":
-                rentRollRows = await ReportService.GetRentRollAsync(selectedPropertyId);
+                rentRollRows = await ReportService.GetRentRollAsync(selectedPropertyId, queryDate);
                 break;
             case "OutstandingPayments":
-                outstandingRows = await ReportService.GetOutstandingPaymentsAsync(selectedPropertyId);
+                outstandingRows = await ReportService.GetOutstandingPaymentsAsync(selectedPropertyId, queryDate);
                 break;
         }
 
@@ -298,9 +305,10 @@
     async Task ExportExcel()
     {
         exporting = true;
-        var bytes    = await ReportService.ExportToExcelAsync(selectedReport, selectedPropertyId);
-        var base64   = Convert.ToBase64String(bytes);
-        var filename = $"{selectedReport}_{DateTime.Today:yyyyMMdd}.xlsx";
+        var queryDate = asOfDate == DateTime.Today ? (DateTime?)null : asOfDate;
+        var bytes     = await ReportService.ExportToExcelAsync(selectedReport, selectedPropertyId, queryDate);
+        var base64    = Convert.ToBase64String(bytes);
+        var filename  = $"{selectedReport}_{asOfDate:yyyyMMdd}.xlsx";
         await JS.InvokeVoidAsync("downloadFile", filename, base64);
         exporting = false;
     }

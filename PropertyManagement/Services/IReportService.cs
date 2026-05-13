@@ -23,7 +23,8 @@ public class RentRollRow
     public DateTime    LeaseStart   { get; set; }
     public DateTime    LeaseEnd     { get; set; }
     public LeaseStatus Status       { get; set; }
-    public int         DaysLeft     => (LeaseEnd - DateTime.Today).Days;
+    public DateTime    AsOfDate     { get; set; } = DateTime.Today;
+    public int         DaysLeft     => (LeaseEnd - AsOfDate).Days;
 }
 
 public class OutstandingPaymentRow
@@ -38,8 +39,8 @@ public class OutstandingPaymentRow
 
 public interface IReportService
 {
-    Task<List<OccupancyRow>>          GetOccupancySummaryAsync(int propertyId);
-    Task<List<RentRollRow>>           GetRentRollAsync(int propertyId);
-    Task<List<OutstandingPaymentRow>> GetOutstandingPaymentsAsync(int propertyId);
-    Task<byte[]>                      ExportToExcelAsync(string reportType, int propertyId);
+    Task<List<OccupancyRow>>          GetOccupancySummaryAsync(int propertyId, DateTime? asOf = null);
+    Task<List<RentRollRow>>           GetRentRollAsync(int propertyId, DateTime? asOf = null);
+    Task<List<OutstandingPaymentRow>> GetOutstandingPaymentsAsync(int propertyId, DateTime? asOf = null);
+    Task<byte[]>                      ExportToExcelAsync(string reportType, int propertyId, DateTime? asOf = null);
 }

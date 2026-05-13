@@ -66,6 +66,7 @@ builder.Services.AddScoped<ILeaseService, LeaseService>();
 builder.Services.AddScoped<ITenantService, TenantService>();
 builder.Services.AddScoped<IRentPaymentService, RentPaymentService>();
 builder.Services.AddScoped<IReportService, ReportService>();
+builder.Services.AddScoped<IExpenseService, ExpenseService>();
 builder.Services.AddScoped<IDocumentService, DocumentService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddScoped<IPropertyAccessService, PropertyAccessService>();

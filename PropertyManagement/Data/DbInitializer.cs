@@ -74,6 +74,58 @@ public static class DbInitializer
 
         await conn.CloseAsync();
 
+        // Seed expenses independently so they populate on existing databases too
+        if (!db.Expenses.Any() && db.Properties.Any())
+        {
+            var liffey       = db.Properties.FirstOrDefault(p => p.Name.Contains("Liffey"));
+            var grandCanal   = db.Properties.FirstOrDefault(p => p.Name.Contains("Grand Canal"));
+            var stoneybatter = db.Properties.FirstOrDefault(p => p.Name.Contains("Stoneybatter"));
+
+            if (liffey != null && grandCanal != null && stoneybatter != null)
+            {
+                db.Expenses.AddRange(
+                    // Liffey Court
+                    new Expense { PropertyId = liffey.Id,       Category = ExpenseCategory.Insurance,     Description = "Annual building insurance renewal",          Amount = 2400m,  Date = new DateTime(2025, 1, 15),  CreatedAt = DateTime.UtcNow },
+                    new Expense { PropertyId = liffey.Id,       Category = ExpenseCategory.Repairs,       Description = "Emergency plumbing — unit 102 leak",         Amount = 350m,   Date = new DateTime(2025, 2, 8),   CreatedAt = DateTime.UtcNow, Vendor = "Dublin Plumbing Ltd" },
+                    new Expense { PropertyId = liffey.Id,       Category = ExpenseCategory.ManagementFee, Description = "Q1 property management fee",                 Amount = 1200m,  Date = new DateTime(2025, 3, 1),   CreatedAt = DateTime.UtcNow },
+                    new Expense { PropertyId = liffey.Id,       Category = ExpenseCategory.Cleaning,      Description = "Common area deep clean",                     Amount = 280m,   Date = new DateTime(2025, 3, 20),  CreatedAt = DateTime.UtcNow, Vendor = "SparkleClean Ltd" },
+                    new Expense { PropertyId = liffey.Id,       Category = ExpenseCategory.Maintenance,   Description = "Lift servicing and safety cert",             Amount = 850m,   Date = new DateTime(2025, 5, 10),  CreatedAt = DateTime.UtcNow, Vendor = "Otis Ireland" },
+                    new Expense { PropertyId = liffey.Id,       Category = ExpenseCategory.Utilities,     Description = "Common area electricity — Q2",               Amount = 420m,   Date = new DateTime(2025, 7, 3),   CreatedAt = DateTime.UtcNow },
+                    new Expense { PropertyId = liffey.Id,       Category = ExpenseCategory.ManagementFee, Description = "Q3 property management fee",                 Amount = 1200m,  Date = new DateTime(2025, 9, 1),   CreatedAt = DateTime.UtcNow },
+                    new Expense { PropertyId = liffey.Id,       Category = ExpenseCategory.Repairs,       Description = "Roof membrane repair — storm damage",        Amount = 1800m,  Date = new DateTime(2025, 9, 22),  CreatedAt = DateTime.UtcNow, Vendor = "Apex Roofing" },
+                    new Expense { PropertyId = liffey.Id,       Category = ExpenseCategory.ManagementFee, Description = "Q4 property management fee",                 Amount = 1200m,  Date = new DateTime(2025, 12, 1),  CreatedAt = DateTime.UtcNow },
+                    new Expense { PropertyId = liffey.Id,       Category = ExpenseCategory.Insurance,     Description = "Annual building insurance renewal",          Amount = 2400m,  Date = new DateTime(2026, 1, 15),  CreatedAt = DateTime.UtcNow },
+                    new Expense { PropertyId = liffey.Id,       Category = ExpenseCategory.Cleaning,      Description = "Common area deep clean",                     Amount = 280m,   Date = new DateTime(2026, 3, 18),  CreatedAt = DateTime.UtcNow, Vendor = "SparkleClean Ltd" },
+
+                    // Grand Canal
+                    new Expense { PropertyId = grandCanal.Id,   Category = ExpenseCategory.Insurance,     Description = "Annual building insurance renewal",          Amount = 3200m,  Date = new DateTime(2025, 1, 10),  CreatedAt = DateTime.UtcNow },
+                    new Expense { PropertyId = grandCanal.Id,   Category = ExpenseCategory.ManagementFee, Description = "Q1 property management fee",                 Amount = 1500m,  Date = new DateTime(2025, 3, 1),   CreatedAt = DateTime.UtcNow },
+                    new Expense { PropertyId = grandCanal.Id,   Category = ExpenseCategory.Utilities,     Description = "Common area electricity and water — Q1",     Amount = 580m,   Date = new DateTime(2025, 4, 5),   CreatedAt = DateTime.UtcNow },
+                    new Expense { PropertyId = grandCanal.Id,   Category = ExpenseCategory.Maintenance,   Description = "HVAC system annual service",                 Amount = 1200m,  Date = new DateTime(2025, 5, 18),  CreatedAt = DateTime.UtcNow, Vendor = "CoolAir Services" },
+                    new Expense { PropertyId = grandCanal.Id,   Category = ExpenseCategory.Legal,         Description = "Solicitor fees — lease renewal advice",      Amount = 450m,   Date = new DateTime(2025, 7, 14),  CreatedAt = DateTime.UtcNow, Vendor = "Brennan & Co Solicitors" },
+                    new Expense { PropertyId = grandCanal.Id,   Category = ExpenseCategory.Repairs,       Description = "Intercom and access control repair",         Amount = 920m,   Date = new DateTime(2025, 8, 29),  CreatedAt = DateTime.UtcNow, Vendor = "SecureEntry Ltd" },
+                    new Expense { PropertyId = grandCanal.Id,   Category = ExpenseCategory.ManagementFee, Description = "Q3 property management fee",                 Amount = 1500m,  Date = new DateTime(2025, 9, 1),   CreatedAt = DateTime.UtcNow },
+                    new Expense { PropertyId = grandCanal.Id,   Category = ExpenseCategory.Cleaning,      Description = "End-of-year common area deep clean",         Amount = 350m,   Date = new DateTime(2025, 12, 10), CreatedAt = DateTime.UtcNow, Vendor = "SparkleClean Ltd" },
+                    new Expense { PropertyId = grandCanal.Id,   Category = ExpenseCategory.ManagementFee, Description = "Q4 property management fee",                 Amount = 1500m,  Date = new DateTime(2025, 12, 1),  CreatedAt = DateTime.UtcNow },
+                    new Expense { PropertyId = grandCanal.Id,   Category = ExpenseCategory.Insurance,     Description = "Annual building insurance renewal",          Amount = 3200m,  Date = new DateTime(2026, 1, 10),  CreatedAt = DateTime.UtcNow },
+                    new Expense { PropertyId = grandCanal.Id,   Category = ExpenseCategory.Maintenance,   Description = "Car park lighting replacement",              Amount = 680m,   Date = new DateTime(2026, 2, 22),  CreatedAt = DateTime.UtcNow, Vendor = "Bright Electrical" },
+
+                    // Stoneybatter
+                    new Expense { PropertyId = stoneybatter.Id, Category = ExpenseCategory.Insurance,     Description = "Annual building insurance renewal",          Amount = 1800m,  Date = new DateTime(2025, 1, 20),  CreatedAt = DateTime.UtcNow },
+                    new Expense { PropertyId = stoneybatter.Id, Category = ExpenseCategory.Repairs,       Description = "Boiler replacement — unit 2",                Amount = 1450m,  Date = new DateTime(2025, 3, 12),  CreatedAt = DateTime.UtcNow, Vendor = "Heatwave Plumbing" },
+                    new Expense { PropertyId = stoneybatter.Id, Category = ExpenseCategory.ManagementFee, Description = "Q1 property management fee",                 Amount = 900m,   Date = new DateTime(2025, 3, 1),   CreatedAt = DateTime.UtcNow },
+                    new Expense { PropertyId = stoneybatter.Id, Category = ExpenseCategory.Utilities,     Description = "Shared garden water supply",                 Amount = 320m,   Date = new DateTime(2025, 6, 8),   CreatedAt = DateTime.UtcNow },
+                    new Expense { PropertyId = stoneybatter.Id, Category = ExpenseCategory.Cleaning,      Description = "Garden and bin area cleaning",               Amount = 180m,   Date = new DateTime(2025, 8, 15),  CreatedAt = DateTime.UtcNow, Vendor = "GreenThumb Services" },
+                    new Expense { PropertyId = stoneybatter.Id, Category = ExpenseCategory.Maintenance,   Description = "External painting and guttering",            Amount = 560m,   Date = new DateTime(2025, 10, 3),  CreatedAt = DateTime.UtcNow, Vendor = "Brushwork Painters" },
+                    new Expense { PropertyId = stoneybatter.Id, Category = ExpenseCategory.ManagementFee, Description = "Q3 property management fee",                 Amount = 900m,   Date = new DateTime(2025, 9, 1),   CreatedAt = DateTime.UtcNow },
+                    new Expense { PropertyId = stoneybatter.Id, Category = ExpenseCategory.ManagementFee, Description = "Q4 property management fee",                 Amount = 900m,   Date = new DateTime(2025, 12, 1),  CreatedAt = DateTime.UtcNow },
+                    new Expense { PropertyId = stoneybatter.Id, Category = ExpenseCategory.Insurance,     Description = "Annual building insurance renewal",          Amount = 1800m,  Date = new DateTime(2026, 1, 20),  CreatedAt = DateTime.UtcNow },
+                    new Expense { PropertyId = stoneybatter.Id, Category = ExpenseCategory.Taxes,         Description = "Local Property Tax 2026",                    Amount = 1200m,  Date = new DateTime(2026, 4, 1),   CreatedAt = DateTime.UtcNow }
+                );
+                await db.SaveChangesAsync();
+            }
+        }
+
         if (db.Users.Any()) return;
 
         // Users

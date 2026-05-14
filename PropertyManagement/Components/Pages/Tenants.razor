@@ -11,7 +11,6 @@
 
 <div class="page-wrap">
 
-    <!-- Page Header -->
     <div class="page-hdr">
         <div>
             <h1>Tenants</h1>
@@ -23,7 +22,6 @@
         </button>
     </div>
 
-    <!-- Stats -->
     <div class="stats-grid g4">
         <div class="stat-card">
             <div class="stat-label">Total Tenants</div>
@@ -42,12 +40,11 @@
         </div>
         <div class="stat-card">
             <div class="stat-label">At Risk</div>
-            <div class="stat-value" style="color:var(--red)">@healthScores.Values.Count(s => s.Level == "Red")</div>
+            <div class="stat-value text-red">@healthScores.Values.Count(s => s.Level == "Red")</div>
             <div class="stat-sub">@healthScores.Values.Count(s => s.Level == "Amber") expiring / no lease</div>
         </div>
     </div>
 
-    <!-- Alert -->
     @if (!string.IsNullOrEmpty(successMsg))
     {
         <div class="alert-banner success">
@@ -56,11 +53,10 @@
         </div>
     }
 
-    <!-- Table Card -->
     <div class="content-card panel">
         @if (loading)
         {
-            <div style="display:flex;justify-content:center;padding:32px;">
+            <div class="loading-row">
                 <div class="spinner-border text-primary"></div>
             </div>
         }
@@ -105,13 +101,13 @@
                             <th>Employer</th>
                             <th>Status</th>
                             <th>Health</th>
-                            <th style="text-align:right;">Actions</th>
+                            <th class="td-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var t in PagedTenants)
                         {
-                            <tr style="cursor:pointer;" @onclick="() => OpenPanel(t)" @onclick:stopPropagation="false">
+                            <tr class="row-clickable" @onclick="() => OpenPanel(t)" @onclick:stopPropagation="false">
                                 <td>
                                     <div class="user-cell">
                                         <div class="user-initials">@t.FirstName[0]@t.LastName[0]</div>
@@ -121,8 +117,8 @@
                                         </div>
                                     </div>
                                 </td>
-                                <td style="color:var(--grey);font-size:0.9rem;">@(string.IsNullOrEmpty(t.Phone) ? "—" : t.Phone)</td>
-                                <td style="color:var(--grey);font-size:0.9rem;">@(string.IsNullOrEmpty(t.EmployerName) ? "—" : t.EmployerName)</td>
+                                <td class="td-muted">@(string.IsNullOrEmpty(t.Phone) ? "—" : t.Phone)</td>
+                                <td class="td-muted">@(string.IsNullOrEmpty(t.EmployerName) ? "—" : t.EmployerName)</td>
                                 <td>
                                     <span class="status-badge @(t.IsActive ? "active" : "inactive")">
                                         @(t.IsActive ? "Active" : "Inactive")
@@ -134,16 +130,14 @@
                                     }
                                     @if (hs != null)
                                     {
-                                        <span title="@hs.Reason" style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;font-size:0.75rem;font-weight:700;cursor:default;
-                                            background:@(hs.Level == "Red" ? "#fee2e2" : hs.Level == "Amber" ? "#fef9c3" : "#dcfce7");
-                                            color:@(hs.Level == "Red" ? "#dc2626" : hs.Level == "Amber" ? "#b45309" : "#16a34a");">
-                                            @(hs.Level == "Red" ? "🔴" : hs.Level == "Amber" ? "⚠️" : "✅")
-                                            @hs.Label
+                                        <span class="health-badge @(hs.Level == "Red" ? "red" : hs.Level == "Amber" ? "amber" : "green")"
+                                              title="@hs.Reason">
+                                            @(hs.Level == "Red" ? "🔴" : hs.Level == "Amber" ? "⚠️" : "✅") @hs.Label
                                         </span>
                                     }
                                     else
                                     {
-                                        <span style="color:#94a3b8;font-size:0.8rem;">—</span>
+                                        <span class="text-muted">—</span>
                                     }
                                 </td>
                                 <td @onclick:stopPropagation="true">
@@ -167,11 +161,11 @@
 
             @if (TotalPages > 1)
             {
-                <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-top:1px solid var(--border);">
-                    <span style="font-size:0.8rem;color:var(--grey);">
+                <div class="card-footer">
+                    <span class="card-footer-info">
                         Page @currentPage of @TotalPages &nbsp;·&nbsp; @FilteredTenants.Count() tenants
                     </span>
-                    <div style="display:flex;gap:6px;">
+                    <div class="card-footer-btns">
                         <button class="btn-action sm" disabled="@(currentPage <= 1)" @onclick="() => currentPage--">← Prev</button>
                         <button class="btn-action sm" disabled="@(currentPage >= TotalPages)" @onclick="() => currentPage++">Next →</button>
                     </div>
@@ -187,7 +181,7 @@
 {
     <div class="modal-overlay" @onclick="() => showForm = false"></div>
     <div class="modal-sheet" @onclick="() => showForm = false">
-        <div class="modal-box" style="max-width:640px;" @onclick:stopPropagation="true">
+        <div class="modal-box md" @onclick:stopPropagation="true">
             <div class="modal-top">
                 <h2>@(editing.Id == 0 ? "Add Tenant" : "Edit Tenant")</h2>
                 <button class="modal-close" @onclick="() => showForm = false">✕</button>
@@ -197,7 +191,7 @@
                 {
                     <div class="field-error">@formError</div>
                 }
-                <div style="display:flex;flex-direction:column;gap:14px;">
+                <div class="form-stack">
                     <div class="field-row c2">
                         <div class="field-group">
                             <label class="field-label">First Name *</label>
@@ -244,7 +238,7 @@
                     </div>
                     <div class="field-group">
                         <label class="field-label">Notes</label>
-                        <textarea class="field-input" rows="2" @bind="editing.Notes" placeholder="Any additional notes…" style="resize:vertical;"></textarea>
+                        <textarea class="field-input resize-v" rows="2" @bind="editing.Notes" placeholder="Any additional notes…"></textarea>
                     </div>
                 </div>
             </div>
@@ -260,19 +254,19 @@
 {
     <div class="modal-backdrop show"></div>
     <div class="modal d-block">
-        <div class="modal-dialog modal-sm" style="margin-top:15vh;">
+        <div class="modal-dialog modal-sm modal-dialog-top">
             <div class="modal-content">
-                <div class="modal-header" style="border-bottom:none;padding-bottom:0;">
-                    <h5 class="modal-title" style="color:#dc2626;">Deactivate Tenant</h5>
+                <div class="modal-header modal-header-clean">
+                    <h5 class="modal-title text-red">Deactivate Tenant</h5>
                     <button type="button" class="btn-close" @onclick="() => pendingDeactivate = null"></button>
                 </div>
-                <div class="modal-body" style="padding-top:10px;">
-                    <p style="margin:0;color:#374151;">
+                <div class="modal-body modal-body-tight">
+                    <p class="mb-0">
                         Are you sure you want to deactivate <strong>@pendingDeactivate.FullName</strong>?
                         They will be marked as inactive but their records will be kept.
                     </p>
                 </div>
-                <div class="modal-footer" style="border-top:none;">
+                <div class="modal-footer modal-footer-clean">
                     <button class="btn btn-secondary" @onclick="() => pendingDeactivate = null">Cancel</button>
                     <button class="btn btn-danger" @onclick="Deactivate">Yes, Deactivate</button>
                 </div>
@@ -283,79 +277,70 @@
 
 @if (selectedTenant != null)
 {
-    <!-- Overlay -->
-    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:1040;" @onclick="ClosePanel"></div>
+    <div class="side-panel-overlay" @onclick="ClosePanel"></div>
 
-    <!-- Slide-in panel -->
-    <div style="position:fixed;top:0;right:0;bottom:0;width:420px;background:#fff;box-shadow:-6px 0 32px rgba(0,0,0,0.14);z-index:1041;overflow-y:auto;display:flex;flex-direction:column;">
+    <div class="side-panel">
 
-        <!-- Header -->
-        <div style="padding:22px 24px 18px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;gap:14px;">
-            <div class="user-initials" style="width:50px;height:50px;font-size:1.1rem;flex-shrink:0;">
-                @selectedTenant.FirstName[0]@selectedTenant.LastName[0]
-            </div>
-            <div style="flex:1;min-width:0;">
-                <div style="font-weight:700;font-size:1.05rem;color:#1c1c1e;">@selectedTenant.FullName</div>
-                <div style="font-size:0.82rem;color:#6b7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">@selectedTenant.Email</div>
+        <div class="sp-hdr">
+            <div class="user-initials lg">@selectedTenant.FirstName[0]@selectedTenant.LastName[0]</div>
+            <div class="sp-hdr-info">
+                <div class="sp-hdr-name">@selectedTenant.FullName</div>
+                <div class="sp-hdr-sub">@selectedTenant.Email</div>
                 @if (!string.IsNullOrEmpty(selectedTenant.Phone))
                 {
-                    <div style="font-size:0.8rem;color:#94a3b8;">@selectedTenant.Phone</div>
+                    <div class="text-muted">@selectedTenant.Phone</div>
                 }
             </div>
-            <button @onclick="ClosePanel" style="background:none;border:none;font-size:1.1rem;color:#94a3b8;cursor:pointer;padding:4px 8px;line-height:1;">✕</button>
+            <button class="sp-close" @onclick="ClosePanel">✕</button>
         </div>
 
         @if (panelLoading)
         {
-            <div style="display:flex;justify-content:center;padding:40px;">
+            <div class="panel-loader">
                 <div class="spinner"></div>
             </div>
         }
         else
         {
-            <!-- Health badge -->
             var hs = healthScores.GetValueOrDefault(selectedTenant.Id);
             if (hs != null)
             {
-                <div style="padding:14px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:10px;">
-                    <span style="padding:4px 12px;border-radius:999px;font-size:0.78rem;font-weight:700;
-                        background:@(hs.Level=="Red"?"#fee2e2":hs.Level=="Amber"?"#fef9c3":"#dcfce7");
-                        color:@(hs.Level=="Red"?"#dc2626":hs.Level=="Amber"?"#b45309":"#16a34a");">
-                        @(hs.Level=="Red"?"🔴":hs.Level=="Amber"?"⚠️":"✅") @hs.Label
+                <div class="sp-health-bar">
+                    <span class="health-badge @(hs.Level == "Red" ? "red" : hs.Level == "Amber" ? "amber" : "green")">
+                        @(hs.Level == "Red" ? "🔴" : hs.Level == "Amber" ? "⚠️" : "✅") @hs.Label
                     </span>
-                    <span style="font-size:0.78rem;color:#94a3b8;">@hs.Reason</span>
+                    <span class="health-badge-reason">@hs.Reason</span>
                 </div>
             }
 
-            <!-- Active Lease -->
             @if (panelLease != null)
             {
-                <div style="padding:18px 24px;border-bottom:1px solid #f1f5f9;">
-                    <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#94a3b8;margin-bottom:10px;">Current Lease</div>
-                    <div style="font-weight:700;font-size:0.95rem;color:#1c1c1e;">@panelLease.Unit.Property.Name</div>
-                    <div style="font-size:0.85rem;color:#6b7280;margin-bottom:10px;">Unit @panelLease.Unit.UnitNumber · @panelLease.Unit.Type</div>
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-                        <div style="background:#f8fafc;border-radius:8px;padding:10px 12px;">
-                            <div style="font-size:0.7rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Monthly Rent</div>
-                            <div style="font-weight:700;color:#1c1c1e;font-size:0.95rem;">€@panelLease.MonthlyRent.ToString("N0")</div>
+                <div class="sp-section">
+                    <div class="section-label">Current Lease</div>
+                    <div class="fw-700">@panelLease.Unit.Property.Name</div>
+                    <div class="text-grey mb-10">Unit @panelLease.Unit.UnitNumber · @panelLease.Unit.Type</div>
+                    <div class="info-grid">
+                        <div class="info-tile">
+                            <div class="info-tile-label">Monthly Rent</div>
+                            <div class="info-tile-value">€@panelLease.MonthlyRent.ToString("N0")</div>
                         </div>
-                        <div style="background:#f8fafc;border-radius:8px;padding:10px 12px;">
-                            <div style="font-size:0.7rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Outstanding</div>
-                            <div style="font-weight:700;font-size:0.95rem;color:@(panelBalance > 0 ? "#dc2626" : "#16a34a");">
+                        <div class="info-tile">
+                            <div class="info-tile-label">Outstanding</div>
+                            <div class="info-tile-value @(panelBalance > 0 ? "text-red" : "text-green")">
                                 @(panelBalance > 0 ? $"€{panelBalance:N0}" : "Paid up")
                             </div>
                         </div>
-                        <div style="background:#f8fafc;border-radius:8px;padding:10px 12px;">
-                            <div style="font-size:0.7rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Lease Start</div>
-                            <div style="font-weight:600;color:#374151;font-size:0.85rem;">@panelLease.StartDate.ToString("dd MMM yyyy")</div>
+                        <div class="info-tile">
+                            <div class="info-tile-label">Lease Start</div>
+                            <div class="info-tile-value">@panelLease.StartDate.ToString("dd MMM yyyy")</div>
                         </div>
-                        <div style="background:#f8fafc;border-radius:8px;padding:10px 12px;">
-                            <div style="font-size:0.7rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Lease End</div>
-                            <div style="font-weight:600;font-size:0.85rem;color:@((panelLease.EndDate - DateTime.Today).Days <= 60 ? "#b45309" : "#374151");">
+                        <div class="info-tile">
+                            <div class="info-tile-label">Lease End</div>
+                            <div class="info-tile-value @((panelLease.EndDate - DateTime.Today).Days <= 60 ? "text-orange" : "")">
                                 @panelLease.EndDate.ToString("dd MMM yyyy")
                                 @if ((panelLease.EndDate - DateTime.Today).Days is >= 0 and <= 60)
                                 {
-                                    <span style="font-size:0.72rem;"> (@((panelLease.EndDate-DateTime.Today).Days)d)</span>
+                                    <span class="text-muted"> (@((panelLease.EndDate - DateTime.Today).Days)d)</span>
                                 }
                             </div>
                         </div>
@@ -364,84 +349,80 @@
             }
             else
             {
-                <div style="padding:16px 24px;border-bottom:1px solid #f1f5f9;">
-                    <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#94a3b8;margin-bottom:6px;">Current Lease</div>
-                    <div style="color:#94a3b8;font-size:0.85rem;">No active lease</div>
+                <div class="sp-section">
+                    <div class="section-label sm">Current Lease</div>
+                    <div class="text-muted">No active lease</div>
                 </div>
             }
 
-            <!-- Recent Payments -->
-            <div style="padding:18px 24px;border-bottom:1px solid #f1f5f9;">
-                <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#94a3b8;margin-bottom:10px;">Recent Payments</div>
+            <div class="sp-section">
+                <div class="section-label">Recent Payments</div>
                 @if (!panelPayments.Any())
                 {
-                    <div style="color:#94a3b8;font-size:0.85rem;">No payments recorded</div>
+                    <div class="text-muted">No payments recorded</div>
                 }
                 else
                 {
                     @foreach (var p in panelPayments)
                     {
-                        <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid #f8fafc;">
+                        <div class="payment-row">
                             <div>
-                                <div style="font-size:0.84rem;font-weight:600;color:#374151;">€@p.Amount.ToString("N2")</div>
-                                <div style="font-size:0.74rem;color:#94a3b8;">@p.PaymentDate.ToString("dd MMM yyyy") · @p.PaymentMethod</div>
+                                <div class="payment-row-amount">€@p.Amount.ToString("N2")</div>
+                                <div class="payment-row-meta">@p.PaymentDate.ToString("dd MMM yyyy") · @p.PaymentMethod</div>
                             </div>
                             @if (p.OutstandingBalance > 0)
                             {
-                                <span style="font-size:0.72rem;background:#fee2e2;color:#dc2626;padding:2px 8px;border-radius:999px;font-weight:700;">€@p.OutstandingBalance.ToString("N0") left</span>
+                                <span class="badge-owed">€@p.OutstandingBalance.ToString("N0") left</span>
                             }
                             else
                             {
-                                <span style="font-size:0.72rem;background:#dcfce7;color:#16a34a;padding:2px 8px;border-radius:999px;font-weight:700;">Paid</span>
+                                <span class="badge-paid">Paid</span>
                             }
                         </div>
                     }
                 }
             </div>
 
-            <!-- Contact details -->
-            <div style="padding:18px 24px;">
-                <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#94a3b8;margin-bottom:10px;">Contact Details</div>
+            <div class="sp-section last">
+                <div class="section-label">Contact Details</div>
                 @if (selectedTenant.DateOfBirth.HasValue)
                 {
-                    <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:0.84rem;">
-                        <span style="color:#94a3b8;">Date of Birth</span>
-                        <span style="color:#374151;font-weight:600;">@selectedTenant.DateOfBirth.Value.ToString("dd MMM yyyy")</span>
+                    <div class="detail-row">
+                        <span class="detail-key">Date of Birth</span>
+                        <span class="detail-val">@selectedTenant.DateOfBirth.Value.ToString("dd MMM yyyy")</span>
                     </div>
                 }
                 @if (!string.IsNullOrEmpty(selectedTenant.EmployerName))
                 {
-                    <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:0.84rem;">
-                        <span style="color:#94a3b8;">Employer</span>
-                        <span style="color:#374151;font-weight:600;">@selectedTenant.EmployerName</span>
+                    <div class="detail-row">
+                        <span class="detail-key">Employer</span>
+                        <span class="detail-val">@selectedTenant.EmployerName</span>
                     </div>
                 }
                 @if (!string.IsNullOrEmpty(selectedTenant.EmployerPhone))
                 {
-                    <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:0.84rem;">
-                        <span style="color:#94a3b8;">Employer Phone</span>
-                        <span style="color:#374151;font-weight:600;">@selectedTenant.EmployerPhone</span>
+                    <div class="detail-row">
+                        <span class="detail-key">Employer Phone</span>
+                        <span class="detail-val">@selectedTenant.EmployerPhone</span>
                     </div>
                 }
                 @if (!string.IsNullOrEmpty(selectedTenant.EmergencyContactName))
                 {
-                    <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:0.84rem;">
-                        <span style="color:#94a3b8;">Emergency Contact</span>
-                        <span style="color:#374151;font-weight:600;">@selectedTenant.EmergencyContactName</span>
+                    <div class="detail-row">
+                        <span class="detail-key">Emergency Contact</span>
+                        <span class="detail-val">@selectedTenant.EmergencyContactName</span>
                     </div>
                 }
                 @if (!string.IsNullOrEmpty(selectedTenant.EmergencyContactPhone))
                 {
-                    <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:0.84rem;">
-                        <span style="color:#94a3b8;">Emergency Phone</span>
-                        <span style="color:#374151;font-weight:600;">@selectedTenant.EmergencyContactPhone</span>
+                    <div class="detail-row">
+                        <span class="detail-key">Emergency Phone</span>
+                        <span class="detail-val">@selectedTenant.EmergencyContactPhone</span>
                     </div>
                 }
                 @if (!string.IsNullOrEmpty(selectedTenant.Notes))
                 {
-                    <div style="margin-top:10px;padding:10px 12px;background:#f8fafc;border-radius:8px;font-size:0.82rem;color:#6b7280;">
-                        @selectedTenant.Notes
-                    </div>
+                    <div class="notes-box">@selectedTenant.Notes</div>
                 }
             </div>
         }
@@ -458,11 +439,9 @@
     string searchTerm = string.Empty, statusFilter = string.Empty, healthFilter = string.Empty;
     HashSet<int>? allowedIds;
 
-    // Pagination
     int currentPage = 1;
     const int PageSize = 10;
 
-    // Profile panel
     Tenant? selectedTenant;
     Lease?  panelLease;
     decimal panelBalance;
@@ -474,7 +453,7 @@
         (string.IsNullOrEmpty(healthFilter)    || healthScores.GetValueOrDefault(t.Id)?.Level == healthFilter)
     );
 
-    IEnumerable<Tenant> PagedTenants  => FilteredTenants.Skip((currentPage - 1) * PageSize).Take(PageSize);
+    IEnumerable<Tenant> PagedTenants => FilteredTenants.Skip((currentPage - 1) * PageSize).Take(PageSize);
     int TotalPages => Math.Max(1, (int)Math.Ceiling(FilteredTenants.Count() / (double)PageSize));
 
     void ResetPage() => currentPage = 1;
@@ -547,7 +526,7 @@
     {
         if (pendingDeactivate == null) return;
         await TenantService.DeactivateAsync(pendingDeactivate.Id);
-        successMsg       = "Tenant deactivated.";
+        successMsg        = "Tenant deactivated.";
         pendingDeactivate = null;
         tenants      = await LoadTenants();
         healthScores = await TenantService.GetHealthScoresAsync(tenants.Select(t => t.Id));

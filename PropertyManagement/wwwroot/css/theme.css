@@ -377,3 +377,200 @@
 .report-table tbody tr:last-child td { border-bottom: none; }
 .report-table tbody tr:hover td { background: var(--grey-lt); }
 .report-table td.fw   { font-weight: 600; }
+
+/* ══════════════════════════════
+   Utility — text colour & weight
+══════════════════════════════ */
+.text-green  { color: var(--green); }
+.text-red    { color: var(--red); }
+.text-orange { color: var(--orange); }
+.text-grey   { color: var(--grey); }
+.text-blue   { color: var(--blue); }
+.text-muted  { color: #94a3b8; }
+.fw-600      { font-weight: 600; }
+.fw-700      { font-weight: 700; }
+.mb-10       { margin-bottom: 10px; }
+
+/* ══════════════════════════════
+   Signing Page  (/sign/:token)
+══════════════════════════════ */
+.sign-wrap        { max-width: 760px; margin: 0 auto; padding: 32px 16px; }
+
+.sign-brand       { text-align: center; margin-bottom: 28px; }
+.sign-brand-inner { display: inline-flex; align-items: center; gap: 10px; }
+.sign-brand-name  { font-size: 22px; font-weight: 700; color: var(--text); }
+
+.sign-loading     { text-align: center; padding: 60px; }
+
+.sign-status-card              { background: #fff; border-radius: 12px; padding: 40px; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+.sign-status-icon              { font-size: 48px; margin-bottom: 16px; }
+.sign-status-card h2           { margin: 0 0 8px; }
+.sign-status-card p            { color: var(--grey); margin: 0; }
+.sign-status-card p:not(:last-child) { margin-bottom: 4px; }
+
+.sign-card        { background: #fff; border-radius: 12px; padding: 28px; box-shadow: 0 1px 4px rgba(0,0,0,.08); margin-bottom: 20px; }
+
+.sign-card-hdr    { background: var(--blue); padding: 20px 24px; border-radius: 8px; margin-bottom: 24px; }
+.sign-card-hdr h1 { color: #fff; margin: 0; font-size: 20px; }
+.sign-card-hdr p  { color: #bfdbfe; margin: 4px 0 0; font-size: 14px; }
+
+.lease-detail-table                { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+.lease-detail-table tr             { border-bottom: 1px solid var(--border); }
+.lease-detail-table tr:last-child  { border-bottom: none; }
+.lease-detail-table td:first-child { padding: 10px 0; color: var(--grey); width: 160px; }
+.lease-detail-table td:last-child  { padding: 10px 0; font-weight: 600; }
+
+.sign-terms-title { font-size: 15px; margin: 0 0 12px; color: var(--text); }
+.sign-terms       { font-size: 14px; line-height: 1.7; color: var(--text-soft); display: flex; flex-direction: column; gap: 8px; }
+.sign-terms p     { margin: 0; }
+
+.sign-sig-title   { margin: 0 0 16px; font-size: 16px; color: var(--text); }
+.sign-sig-desc    { color: var(--grey); font-size: 14px; margin: 0 0 16px; }
+
+.sign-error       { background: #fef2f2; border: 1px solid #fca5a5; border-radius: 6px; padding: 10px 14px; color: var(--red); font-size: 14px; margin-bottom: 14px; }
+
+.sign-field-wrap        { margin-bottom: 16px; }
+.sign-field-label       { display: block; font-size: 13px; font-weight: 600; color: var(--text-soft); margin-bottom: 6px; }
+.sign-field-input       { width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 15px; box-sizing: border-box; outline: none; transition: var(--t); }
+.sign-field-input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+
+.sign-actions           { display: flex; gap: 12px; flex-wrap: wrap; }
+.btn-sign               { flex: 1; min-width: 160px; padding: 12px 24px; background: var(--green); color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 700; cursor: pointer; transition: var(--t); }
+.btn-sign:hover         { background: #15803d; }
+.btn-sign:disabled      { opacity: 0.6; cursor: not-allowed; }
+.btn-decline            { padding: 12px 24px; background: #fff; color: var(--red); border: 1px solid #fca5a5; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; transition: var(--t); }
+.btn-decline:hover      { background: var(--red-lt); }
+.btn-decline:disabled   { opacity: 0.6; cursor: not-allowed; }
+
+/* ══════════════════════════════
+   Side Panel (slide-in drawer from right)
+   Used by Tenants and Properties pages
+══════════════════════════════ */
+.side-panel-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 1040; }
+.side-panel         { position: fixed; top: 0; right: 0; bottom: 0; width: 420px; background: #fff; box-shadow: -6px 0 32px rgba(0,0,0,.14); z-index: 1041; overflow-y: auto; display: flex; flex-direction: column; }
+
+.sp-hdr      { padding: 22px 24px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 14px; }
+.sp-hdr-info { flex: 1; min-width: 0; }
+.sp-hdr-name { font-weight: 700; font-size: 1.05rem; color: var(--text); }
+.sp-hdr-sub  { font-size: 0.82rem; color: var(--grey); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sp-close    { background: none; border: none; font-size: 1.1rem; color: #94a3b8; cursor: pointer; padding: 4px 8px; line-height: 1; }
+
+.sp-section      { padding: 18px 24px; border-bottom: 1px solid #f1f5f9; }
+.sp-section.last { border-bottom: none; }
+.sp-health-bar   { padding: 14px 24px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; gap: 10px; }
+
+.section-label    { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #94a3b8; margin-bottom: 10px; }
+.section-label.sm { margin-bottom: 6px; }
+
+/* ── Info tiles (2-col key/value grid in panels) ── */
+.info-grid       { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.info-tile       { background: #f8fafc; border-radius: 8px; padding: 10px 12px; }
+.info-tile-label { font-size: 0.7rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; }
+.info-tile-value { font-weight: 700; color: var(--text); font-size: 0.9rem; }
+
+/* ── Detail rows (key-value list in panels) ── */
+.detail-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 0.84rem; }
+.detail-key { color: #94a3b8; }
+.detail-val { color: var(--text-soft); font-weight: 600; }
+
+/* ── Payment row ── */
+.payment-row        { display: flex; align-items: center; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid #f8fafc; }
+.payment-row-amount { font-size: 0.84rem; font-weight: 600; color: var(--text-soft); }
+.payment-row-meta   { font-size: 0.74rem; color: #94a3b8; }
+.badge-owed { font-size: 0.72rem; background: var(--red-lt);   color: var(--red);   padding: 2px 8px; border-radius: 999px; font-weight: 700; }
+.badge-paid { font-size: 0.72rem; background: var(--green-lt); color: var(--green); padding: 2px 8px; border-radius: 999px; font-weight: 700; }
+
+/* ── Notes box ── */
+.notes-box { margin-top: 10px; padding: 10px 12px; background: #f8fafc; border-radius: 8px; font-size: 0.82rem; color: var(--grey); }
+
+/* ── Health badge ── */
+.health-badge        { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 700; cursor: default; }
+.health-badge.green  { background: var(--green-lt); color: var(--green); }
+.health-badge.amber  { background: #fef9c3;          color: #b45309; }
+.health-badge.red    { background: var(--red-lt);    color: var(--red); }
+.health-badge-reason { font-size: 0.78rem; color: #94a3b8; }
+
+/* ── Table / row utilities ── */
+.td-muted      { color: var(--grey); font-size: 0.9rem; }
+.td-right      { text-align: right; }
+.row-clickable { cursor: pointer; }
+
+/* ── Card footer / pagination ── */
+.card-footer      { display: flex; align-items: center; justify-content: space-between; padding: 12px 20px; border-top: 1px solid var(--border); }
+.card-footer-info { font-size: 0.8rem; color: var(--grey); }
+.card-footer-btns { display: flex; gap: 6px; }
+
+/* ── Form helpers ── */
+.form-stack { display: flex; flex-direction: column; gap: 14px; }
+.resize-v   { resize: vertical; }
+
+/* ── Modal size variants ── */
+.modal-box.md { max-width: 640px; }
+.modal-box.lg { max-width: 680px; }
+.modal-box.xl { max-width: 860px; width: 95vw; }
+
+/* ── Confirm dialog Bootstrap overrides ── */
+.modal-dialog-top   { margin-top: 15vh; }
+.modal-header-clean { border-bottom: none !important; padding-bottom: 0 !important; }
+.modal-body-tight   { padding-top: 10px !important; }
+.modal-footer-clean { border-top: none !important; }
+
+/* ── Loading states ── */
+.loading-row  { display: flex; justify-content: center; padding: 32px; }
+.panel-loader { display: flex; justify-content: center; padding: 40px; }
+
+/* ── User initials size variant ── */
+.user-initials.lg { width: 50px; height: 50px; font-size: 1.1rem; }
+
+/* ── Skeleton loader (Properties page) ── */
+.skeleton-avatar   { width: 48px; height: 48px; border-radius: 12px; flex-shrink: 0; }
+.skeleton-body     { flex: 1; }
+.skeleton-title    { width: 180px; height: 16px; margin-bottom: 8px; }
+.skeleton-subtitle { width: 260px; height: 12px; }
+
+/* ── Unit action buttons row ── */
+.btn-row { display: flex; gap: 6px; }
+
+/* ── Danger variant for btn-eu ── */
+.btn-eu.danger       { color: var(--red); border-color: var(--red); }
+.btn-eu.danger:hover { background: var(--red); color: #fff; }
+
+/* ── Tenant link arrow icon ── */
+.tenant-link svg { flex-shrink: 0; color: #8E8E93; }
+
+/* ── Coordinate hint / field hint text ── */
+.field-hint   { font-size: 0.75rem; color: #94a3b8; margin-top: -8px; margin-bottom: 4px; }
+.field-hint a { color: var(--blue); }
+
+/* ── Property image preview ── */
+.prop-img-preview { width: 100%; max-height: 160px; object-fit: cover; border-radius: 8px; margin-bottom: 8px; }
+
+/* ── File input padding ── */
+.input-file { padding: 6px; }
+
+/* ── Confirm modal body padding ── */
+.modal-body-confirm { padding-top: 28px; padding-bottom: 8px; }
+
+/* ── Side panel icon box (unit history) ── */
+.sp-hdr-icon { width: 46px; height: 46px; border-radius: 10px; background: #f1f5f9; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+
+/* ── Panel empty state ── */
+.panel-empty     { padding: 48px 24px; text-align: center; color: #94a3b8; }
+.panel-empty svg { margin: 0 auto 12px; display: block; opacity: 0.4; }
+.panel-empty div { font-size: 0.9rem; }
+
+/* ── History section wrapper ── */
+.history-list { padding: 18px 24px 8px; }
+
+/* ── History lease card ── */
+.history-card     { border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; }
+.history-card-hdr { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.history-avatar   { width: 36px; height: 36px; border-radius: 50%; background: #e0e7ff; display: flex; align-items: center; justify-content: center; font-size: 0.78rem; font-weight: 700; color: #4338ca; flex-shrink: 0; }
+.history-meta     { flex: 1; min-width: 0; }
+.history-name     { font-weight: 600; font-size: 0.9rem; color: var(--text); }
+.history-email    { font-size: 0.78rem; color: var(--grey); }
+
+/* ── Info tile small variant & sub-text ── */
+.info-tile.sm    { padding: 8px 10px; }
+.info-tile-sub   { font-size: 0.72rem; color: #94a3b8; }
+.section-label.lg { margin-bottom: 14px; }

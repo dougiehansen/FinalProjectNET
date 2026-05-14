@@ -4,6 +4,7 @@
 @inject IPropertyService PropertyService
 @inject AuthenticationStateProvider AuthStateProvider
 @inject IPropertyAccessService AccessService
+@inject IJSRuntime JS
 @using PropertyManagement.Models
 
 <PageTitle>Expenses - PropertyMS</PageTitle>
@@ -49,6 +50,15 @@
                 <div class="stat-value">€@AllTime.ToString("N0")</div>
                 <div class="stat-sub">@expenses.Count entries</div>
             </div>
+        </div>
+    }
+
+    <!-- Category breakdown chart -->
+    @if (!loading && expenses.Any())
+    {
+        <div class="content-card chart-card" style="margin-bottom:20px;">
+            <h2>Expenses by Category</h2>
+            <canvas id="expense-chart" style="max-height:260px;"></canvas>
         </div>
     }
 
@@ -244,6 +254,7 @@
 
 @code {
     bool loading = true, saving;
+    bool _needsChartUpdate;
     string successMsg = string.Empty;
     string formError  = string.Empty;
     bool showForm;
@@ -281,9 +292,35 @@
         var cat = Enum.TryParse<ExpenseCategory>(filterCategory, out var c) ? (ExpenseCategory?)c : null;
         expenses = await ExpenseService.GetAllAsync(filterPropertyId > 0 ? filterPropertyId : null, cat, filterFrom, filterTo);
         loading = false;
+        _needsChartUpdate = true;
     }
 
     Task ApplyFilters() => LoadExpenses();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender || _needsChartUpdate)
+        {
+            _needsChartUpdate = false;
+            await UpdateChartAsync();
+        }
+    }
+
+    async Task UpdateChartAsync()
+    {
+        if (!expenses.Any()) return;
+
+        var grouped = expenses
+            .GroupBy(e => e.Category)
+            .OrderByDescending(g => g.Sum(e => e.Amount))
+            .ToList();
+
+        var labels  = grouped.Select(g => g.Key.ToString()).ToArray();
+        var amounts = grouped.Select(g => (double)g.Sum(e => e.Amount)).ToArray();
+        var colours = grouped.Select(g => CategoryColour(g.Key)).ToArray();
+
+        try { await JS.InvokeVoidAsync("expenseChart.init", "expense-chart", labels, amounts, colours); } catch { }
+    }
 
     void OpenAdd()
     {

@@ -1,14 +1,41 @@
+@* needed for making http requests - used in Reports.razor and Home.razor *@
 @using System.Net.Http
+
+@* this lets me call GetFromJsonAsync to get data from the api easier - used in Reports.razor and Home.razor *@
 @using System.Net.Http.Json
+
+@* needed for forms like EditForm and InputText - used in Leases.razor and Users.razor *@
 @using Microsoft.AspNetCore.Components.Forms
+
+@* needed for NavLink and navigation stuff - used in NavMenu.razor, RedirectToLogin.razor, Properties.razor *@
 @using Microsoft.AspNetCore.Components.Routing
+
+@* basic blazor stuff, needed for things like onclick and onchange events - used pretty much everywhere *@
 @using Microsoft.AspNetCore.Components.Web
+
+@* this lets me just write InteractiveServer instead of the whole long name - used in App.razor *@
 @using static Microsoft.AspNetCore.Components.Web.RenderMode
+
+@* for the Virtualize component if i need to show big lists without crashing the browser *@
 @using Microsoft.AspNetCore.Components.Web.Virtualization
+
+@* needed for login/auth stuff like AuthorizeView and checking if user is logged in - used in Routes.razor, NavMenu.razor, RentPayments.razor, Maintenance.razor *@
 @using Microsoft.AspNetCore.Components.Authorization
+
+@* needed to call javascript from c# - used in Reports.razor and Home.razor *@
 @using Microsoft.JSInterop
+
+@* so i dont have to type PropertyManagement. everywhere in the project *@
 @using PropertyManagement
+
+@* lets me use my components without the full namespace *@
 @using PropertyManagement.Components
+
+@* for the layout stuff like MainLayout - used in App.razor and MainLayout.razor *@
 @using PropertyManagement.Components.Layout
+
+@* my model classes like Property, Tenant, Lease etc *@
 @using PropertyManagement.Models
+
+@* my service classes, pretty much every page uses these to get data *@
 @using PropertyManagement.Services

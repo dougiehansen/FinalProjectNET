@@ -1,6 +1,9 @@
+@* inject NavigationManager so i can redirect the user to a different page *@
 @inject NavigationManager Nav
 
 @code {
+    @* this runs automatically when the component loads *@
+    @* forceLoad: true does a full page reload instead of a blazor soft navigation *@
     protected override void OnInitialized()
         => Nav.NavigateTo("/Account/Login", forceLoad: true);
 }

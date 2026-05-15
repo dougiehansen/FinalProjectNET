@@ -1,14 +1,22 @@
+@* MainLayout.razor - this is the main layout that wraps every page in the app.
+   it has the sidebar with the nav menu on the left and the page content on the right.
+   its set as the default layout in Routes.razor so all pages use it automatically. *@
+
 @inherits LayoutComponentBase
 
+@* the outer shell of the app - sidebar on the left, page content on the right *@
 <div class="app-shell">
     <aside class="sidebar">
+        @* my nav menu component that shows on every page *@
         <NavMenu />
     </aside>
     <main class="main-content">
+        @* this is where the actual page gets rendered (Properties, Leases, etc.) *@
         @Body
     </main>
 </div>
 
+@* this is hidden by default, blazor shows it automatically if something crashes *@
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.
     <a href="." class="reload">Reload</a>

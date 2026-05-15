@@ -1,11 +1,34 @@
+@* Wrap the whole app in CascadingAuthenticationState so that
+   the current AuthenticationState is available to all child components   *@
 <CascadingAuthenticationState>
-    <Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
+
+    @* Router decides which page/component to show based on the URL.
+       AppAssembly tells it where to look for routable components (those with @page).
+       NotFoundPage is the component to use when no route matches (404). *@
+    <Router AppAssembly="typeof(Program).Assembly"
+            NotFoundPage="typeof(Pages.NotFound)">
+
+        @* This block renders when a route match is FOUND.
+           The matching information is exposed as 'routeData'. *@
         <Found Context="routeData">
-            <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
+
+            @* AuthorizeRouteView is like RouteView but with authorization support.
+               - RouteData: which component to render for this route
+               - DefaultLayout: layout to wrap the page in, if it doesn't specify its own *@
+            <AuthorizeRouteView RouteData="routeData"
+                                DefaultLayout="typeof(Layout.MainLayout)">
+
+                @* This content is shown when the user is NOT authorized
+                   to view the page (e.g., not logged in or lacks required roles). *@
                 <NotAuthorized>
+                    @* Custom component that redirects the user to the login page
+                       instead of just showing an "Unauthorized" message. *@
                     <RedirectToLogin />
                 </NotAuthorized>
             </AuthorizeRouteView>
+
+            @* After navigation, move focus to the first <h1> on the page.
+               This is mainly for accessibility (screen readers, keyboard users). *@
             <FocusOnNavigate RouteData="routeData" Selector="h1" />
         </Found>
     </Router>

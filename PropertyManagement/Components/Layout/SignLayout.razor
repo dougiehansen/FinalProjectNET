@@ -1,9 +1,16 @@
+@* SignLayout.razor - custom layout just for the login page, no sidebar or nav menu.
+   its used in Sign.razor so the login page has a clean plain look. *@
+
+@* same as MainLayout, needed to get access to @Body *@
 @inherits LayoutComponentBase
 
+@* plain gray full screen background, no nav or sidebar *@
 <div style="min-height:100vh;background:#f3f4f6;font-family:Arial,sans-serif;">
+    @* renders the login page content here *@
     @Body
 </div>
 
+@* same error banner as MainLayout, blazor shows this if something crashes *@
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.
     <a href="." class="reload">Reload</a>

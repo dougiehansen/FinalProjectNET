@@ -28,8 +28,9 @@ public class LeaseExpiryWorker : BackgroundService
                 _logger.LogError(ex, "LeaseExpiryWorker error.");
             }
 
-            // Run once on startup then every 24 hours
-            await Task.Delay(TimeSpan.FromHours(24), stoppingToken);
+            // wait 24 hours before running again, exit cleanly if app is shutting down
+            try { await Task.Delay(TimeSpan.FromHours(24), stoppingToken); }
+            catch (TaskCanceledException) { break; }
         }
     }
 }

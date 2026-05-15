@@ -21,5 +21,10 @@ public class ApplicationDbContext : DbContext
     {
         modelBuilder.Entity<UserPropertyAssignment>()
             .HasKey(x => new { x.UserId, x.PropertyId });
+
+        // unit numbers must be unique within the same property
+        modelBuilder.Entity<Unit>()
+            .HasIndex(u => new { u.PropertyId, u.UnitNumber })
+            .IsUnique();
     }
 }

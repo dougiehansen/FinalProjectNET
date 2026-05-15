@@ -1,5 +1,5 @@
 namespace PropertyManagement.Models;
-
+using System.ComponentModel.DataAnnotations;   //for the required email address
 public enum UserRole { Administrator, PropertyManager, AccountingTeam }
 
 public class User
@@ -8,6 +8,9 @@ public class User
     public string FirstName { get; set; } = string.Empty;
     public string LastName { get; set; } = string.Empty;
     public string FullName => $"{FirstName} {LastName}";
+
+    [Required]
+    [EmailAddress]
     public string Email { get; set; } = string.Empty;
     public string PasswordHash { get; set; } = string.Empty;
     public UserRole Role { get; set; }

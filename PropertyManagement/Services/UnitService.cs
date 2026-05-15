@@ -25,6 +25,9 @@ public class UnitService : IUnitService
     /// <inheritdoc/>
     public async Task CreateAsync(Unit unit)
     {
+        var duplicate = await _db.Units.AnyAsync(u => u.PropertyId == unit.PropertyId && u.UnitNumber == unit.UnitNumber);
+        if (duplicate) throw new InvalidOperationException($"Unit '{unit.UnitNumber}' already exists in this property.");
+
         unit.CreatedAt = DateTime.UtcNow;
         _db.Units.Add(unit);
         await _db.SaveChangesAsync();
@@ -35,6 +38,9 @@ public class UnitService : IUnitService
     {
         var existing = await _db.Units.FindAsync(unit.Id);
         if (existing == null) return;
+
+        var duplicate = await _db.Units.AnyAsync(u => u.PropertyId == unit.PropertyId && u.UnitNumber == unit.UnitNumber && u.Id != unit.Id);
+        if (duplicate) throw new InvalidOperationException($"Unit '{unit.UnitNumber}' already exists in this property.");
 
         existing.UnitNumber  = unit.UnitNumber;
         existing.Type        = unit.Type;

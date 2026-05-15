@@ -18,6 +18,9 @@ public class PropertyService : IPropertyService
 
     public async Task CreateAsync(Property property)
     {
+        var duplicate = await _db.Properties.AnyAsync(p => p.Name == property.Name && p.Address == property.Address);
+        if (duplicate) throw new InvalidOperationException($"A property named '{property.Name}' at that address already exists.");
+
         property.CreatedAt = DateTime.UtcNow;
         _db.Properties.Add(property);
         await _db.SaveChangesAsync();
@@ -27,6 +30,9 @@ public class PropertyService : IPropertyService
     {
         var existing = await _db.Properties.FindAsync(property.Id);
         if (existing == null) return;
+
+        var duplicate = await _db.Properties.AnyAsync(p => p.Name == property.Name && p.Address == property.Address && p.Id != property.Id);
+        if (duplicate) throw new InvalidOperationException($"A property named '{property.Name}' at that address already exists.");
 
         existing.Name         = property.Name;
         existing.Address      = property.Address;
@@ -44,6 +50,9 @@ public class PropertyService : IPropertyService
 
     public async Task DeactivateAsync(int id)
     {
+        var hasActiveLeases = await _db.Leases.AnyAsync(l => l.Unit.PropertyId == id && l.Status == LeaseStatus.Active);
+        if (hasActiveLeases) throw new InvalidOperationException("Cannot deactivate a property that has active leases. End all leases first.");
+
         var property = await _db.Properties.FindAsync(id);
         if (property != null)
         {

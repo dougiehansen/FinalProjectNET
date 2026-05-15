@@ -443,7 +443,7 @@
                 <div class="confirm-title">Deactivate Property?</div>
                 <div class="confirm-msg">
                     <strong>@confirmTarget.Name</strong> will be marked inactive.<br/>
-                    Existing units and leases remain unchanged.
+                    This is only allowed if there are no active leases on this property.
                 </div>
             </div>
             <div class="modal-foot center">
@@ -735,8 +735,16 @@
             pendingImage = null;
         }
         bool isNew = editProp.Id == 0;
-        if (isNew) await PropertyService.CreateAsync(editProp);
-        else       await PropertyService.UpdateAsync(editProp);
+        try
+        {
+            if (isNew) await PropertyService.CreateAsync(editProp);
+            else       await PropertyService.UpdateAsync(editProp);
+        }
+        catch (InvalidOperationException ex)
+        {
+            propErr = ex.Message;
+            return;
+        }
 
         showPropForm = false;
         await LoadData();
@@ -760,7 +768,16 @@
     async Task DoDeactivate()
     {
         if (confirmTarget == null) return;
-        await PropertyService.DeactivateAsync(confirmTarget.Id);
+        try
+        {
+            await PropertyService.DeactivateAsync(confirmTarget.Id);
+        }
+        catch (InvalidOperationException ex)
+        {
+            showConfirm = false;
+            propErr = ex.Message;
+            return;
+        }
         var name = confirmTarget.Name;
         showConfirm = false; confirmTarget = null;
         await LoadData();
@@ -795,8 +812,16 @@
             return;
         }
         bool isNew = editUnit.Id == 0;
-        if (isNew) await UnitService.CreateAsync(editUnit);
-        else       await UnitService.UpdateAsync(editUnit);
+        try
+        {
+            if (isNew) await UnitService.CreateAsync(editUnit);
+            else       await UnitService.UpdateAsync(editUnit);
+        }
+        catch (InvalidOperationException ex)
+        {
+            unitErr = ex.Message;
+            return;
+        }
 
         showUnitForm = false;
         await LoadData();

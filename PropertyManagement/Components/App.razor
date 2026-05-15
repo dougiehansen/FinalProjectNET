@@ -1,33 +1,66 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
-    <meta charset="utf-8" />
+   
+    <meta charset="utf-8" 
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
+
+    @* built‑in Blazor component that preloads resources *@
     <ResourcePreloader />
+
+    @* bootstrap css - used everywhere for layout, buttons, tables etc *@
     <link rel="stylesheet" href="@Assets["lib/bootstrap/dist/css/bootstrap.min.css"]" />
+
+    @* my main app css file *@
     <link rel="stylesheet" href="@Assets["app.css"]" />
+
+    @* my custom theme file for colors and stuff *@
     <link rel="stylesheet" href="@Assets["css/theme.css"]" />
+
+    @* blazor auto-generated css file that scopes styles to each component *@
     <link rel="stylesheet" href="@Assets["PropertyManagement.styles.css"]" />
+
+    @* needed for js imports to work in blazor *@
     <ImportMap />
+
+    @* leaflet css for the map - used in Properties.razor *@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    @* font awesome icons - used pretty much everywhere for icons like trash, edit, etc *@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+
+    @* tab icon in the browser *@
     <link rel="icon" type="image/png" href="favicon.png" />
+
+    @* built‑in Blazor component lets pages set their own title and add stuff to the head tag *@
     <HeadOutlet />
 </head>
 
 <body>
+    @* this loads all my pages/routes, prerender is off so it doesnt flash on load *@
     <Routes @rendermode="@(new InteractiveServerRenderMode(prerender: false))" />
+
+    @* shows a message when the blazor connection drops instead of just freezing *@
     <ReconnectModal />
+
+    @* the main blazor script, has to be here for everything to work *@
     <script src="@Assets["_framework/blazor.web.js"]"></script>
+
+    @* leaflet js for the map - used in Properties.razor *@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    @* my custom js that sets up the leaflet map - used in Properties.razor *@
     <script src="js/leaflet-map.js"></script>
+    @* chart.js library for graphs - used in Reports.razor and Expenses.razor *@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="js/rent-chart.js"></script>
+
+    @* my js charts for revenue and expenses - used in Reports.razor *@
     <script src="js/revenue-chart.js"></script>
     <script src="js/expense-chart.js"></script>
-    <script src="js/economic-signals.js"></script>
+
+    @* my js helper for downloading files like PDFs - used in Leases.razor *@
     <script src="js/file-download.js"></script>
 </body>
 

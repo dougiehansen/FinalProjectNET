@@ -1,13 +1,24 @@
 @page "/"
+
+@* only logged in users can see this *@
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
+
+@* database context to query data directly *@
 @inject ApplicationDbContext Db
+
+@* lets me call js functions like leafletMap.init and revenueChart.init *@
 @inject IJSRuntime JS
+@* lets me check what role the user has so i can show the right dashboard *@
 @inject IPropertyAccessService AccessService
 @inject AuthenticationStateProvider AuthStateProvider
-@using Microsoft.EntityFrameworkCore
-@using PropertyManagement.Data
-@using PropertyManagement.Models
+@* reads values from appsettings.json like LeaseRenewalNoticeDays *@
+@inject IConfiguration Config
+@using Microsoft.EntityFrameworkCore                         @* needed for .Include() and EF Core queries *@
+@using PropertyManagement.Data                               @* needed to access ApplicationDbContext *@
+@using PropertyManagement.Models                             @* needed for model classes like Property, Lease *@
 @using PropertyManagement.Services
+
+@* lets me clean up when the component is removed *@
 @implements IDisposable
 
 <PageTitle>Dashboard - PropertyMS</PageTitle>
@@ -118,66 +129,12 @@
         </section>
     }
 
-    <div class="sig-grid">
-        <div class="sig-card" id="ecb-rate">
-            <div class="stat-label">ECB Interest Rate</div>
-            <div class="sig-value">…</div>
-            <div class="stat-sub">Loading…</div>
-            <div class="sig-date"></div>
-        </div>
-        <div class="sig-card" id="hicp-value">
-            <div class="stat-label">Euro Area Inflation (HICP)</div>
-            <div class="sig-value">…</div>
-            <div class="stat-sub">Loading…</div>
-            <div class="sig-date"></div>
-        </div>
-        <div class="sig-card" id="eu-sentiment">
-            <div class="stat-label">EU Economic Sentiment (IE)</div>
-            <div class="sig-value">…</div>
-            <div class="stat-sub">Loading…</div>
-            <div class="sig-date"></div>
-        </div>
-        <div class="sig-card" id="euribor-value">
-            <div class="stat-label">EURIBOR 3-Month</div>
-            <div class="sig-value">…</div>
-            <div class="stat-sub">Loading…</div>
-            <div class="sig-date"></div>
-        </div>
-        <div class="sig-card" id="ire-sentiment">
-            <div class="stat-label">Ireland Consumer Sentiment</div>
-            <div class="sig-value">…</div>
-            <div class="stat-sub">Loading…</div>
-            <div class="sig-date"></div>
-        </div>
-    </div>
-
-    <div class="algo-card">
-        <h2>Suggested Market Rent</h2>
-        <p>Calculated from live ECB rates, HICP inflation and EU sentiment — updated on each page load.</p>
-        <div class="algo-result" id="suggested-rent">Calculating…</div>
-        <div id="rent-algo-breakdown"></div>
-    </div>
-
     <div class="content-card chart-card" style="margin-top:18px;">
         <h2>Monthly Revenue — Last 12 Months</h2>
         <p>Rent collected each month against the current expected monthly income. <span style="color:#16a34a;font-weight:600;">Green</span> bars met or exceeded target; <span style="color:#2563eb;font-weight:600;">blue</span> bars were below; <span style="color:#94a3b8;font-weight:600;">grey</span> months have no payments recorded yet.</p>
         <canvas id="revenue-chart"></canvas>
     </div>
 
-    <div class="two-col-grid" style="margin-top:18px;">
-        <div class="content-card chart-card" style="grid-column: 1 / -1;">
-            <h2>Rent Comparison — Europe vs Our Portfolio</h2>
-            <p>Live data from the <strong>Eurostat Statistics API</strong> (dataset: prc_colc_rents, 2023) compared to our portfolio average of €@portfolioAvg/month.</p>
-            <div class="toolbar">
-                <label for="building-filter" style="font-size:0.82rem;font-weight:600;color:var(--grey);text-transform:uppercase;letter-spacing:0.05em;">Dwelling type</label>
-                <select id="building-filter" class="filter-select" disabled>
-                    <option>Loading…</option>
-                </select>
-            </div>
-            <div class="chart-status" style="color:var(--grey);font-size:0.88rem;margin-bottom:8px;"></div>
-            <canvas id="rent-chart"></canvas>
-        </div>
-    </div>
     <div class="content-card map-card" style="margin-top:18px;">
         <h2>Property Locations</h2>
         <div id="property-map" style="height:320px;"></div>
@@ -232,17 +189,16 @@
 }
 
 @code {
-    // Base stats
+    // base stats
     int totalProperties, totalUnits, occupiedUnits, activeLeases;
-    decimal portfolioAvg;
 
-    // Role-specific stats
+    // role-specific stats
     string userRole = string.Empty;
     decimal monthlyRevenue;
     decimal totalOutstanding;
     int overdueCount, expiringSoon, pendingSignatures, paymentsThisMonth;
 
-    // Revenue chart data
+    // revenue chart data
     string[] revenueLabels  = [];
     decimal[] revenueAmounts = [];
 
@@ -251,7 +207,6 @@
     bool IsAdmin      => userRole == "Administrator";
     bool IsManager    => userRole == "PropertyManager";
     bool IsAccounting => userRole == "AccountingTeam";
-
     List<PropertyMapPin> pins = new();
     PropertyMapPin? selectedPin;
     DotNetObjectReference<Home>? dotNetRef;
@@ -262,23 +217,17 @@
         var allowed = await AccessService.GetAllowedIdsAsync(auth.User);
         userRole    = auth.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? string.Empty;
 
-        // Base counts (all roles)
         totalProperties = await Db.Properties.CountAsync(p => p.IsActive && (allowed == null || allowed.Contains(p.Id)));
         totalUnits      = await Db.Units.CountAsync(u => u.IsActive && (allowed == null || allowed.Contains(u.PropertyId)));
         occupiedUnits   = await Db.Units.CountAsync(u => u.IsActive && u.IsOccupied && (allowed == null || allowed.Contains(u.PropertyId)));
         activeLeases    = await Db.Leases.CountAsync(l => l.Status == LeaseStatus.Active && (allowed == null || allowed.Contains(l.Unit.PropertyId)));
 
-        var rentQuery = Db.Units.Where(u => u.IsActive && (allowed == null || allowed.Contains(u.PropertyId)));
-        portfolioAvg  = await rentQuery.AnyAsync()
-            ? Math.Round(await rentQuery.AverageAsync(u => u.MonthlyRent), 0)
-            : 0;
-
         // Role-specific queries
         if (IsAdmin || IsAccounting)
         {
-            monthlyRevenue = await Db.Units
-                .Where(u => u.IsActive && u.IsOccupied && (allowed == null || allowed.Contains(u.PropertyId)))
-                .SumAsync(u => (decimal?)u.MonthlyRent) ?? 0;
+            monthlyRevenue = await Db.Leases
+                .Where(l => l.Status == LeaseStatus.Active && (allowed == null || allowed.Contains(l.Unit.PropertyId)))
+                .SumAsync(l => (decimal?)l.MonthlyRent) ?? 0;
 
             // Outstanding balance: (months active × rent) − total paid, summed across all active leases
             var today      = DateTime.Today;
@@ -307,7 +256,7 @@
         {
             expiringSoon      = await Db.Leases.CountAsync(l =>
                 l.Status == LeaseStatus.Active &&
-                l.EndDate  <= DateTime.Today.AddDays(60) &&
+                l.EndDate  <= DateTime.Today.AddDays(Config.GetValue<int>("AppSettings:LeaseRenewalNoticeDays", 60)) &&
                 (allowed == null || allowed.Contains(l.Unit.PropertyId)));
 
             pendingSignatures = await Db.Leases.CountAsync(l =>
@@ -359,9 +308,7 @@
     {
         if (firstRender)
         {
-            try { await JS.InvokeVoidAsync("economicSignals.init"); } catch { }
             try { await JS.InvokeVoidAsync("revenueChart.init", "revenue-chart", revenueLabels, revenueAmounts, monthlyRevenue); } catch { }
-            try { await JS.InvokeVoidAsync("rentChart.init", "rent-chart", portfolioAvg); } catch { }
             try
             {
                 dotNetRef = DotNetObjectReference.Create(this);

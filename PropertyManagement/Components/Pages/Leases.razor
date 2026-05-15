@@ -129,6 +129,14 @@
         }
         else
         {
+            <div class="search-wrap" style="margin-bottom:14px;">
+                <svg class="search-icon" width="15" height="15" fill="none" viewBox="0 0 20 20">
+                    <circle cx="9" cy="9" r="7" stroke="#94a3b8" stroke-width="2"/>
+                    <path d="M14.5 14.5L18 18" stroke="#94a3b8" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                <input class="search-inp" placeholder="Search tenant, property, unit…"
+                       value="@searchQ" @oninput="e => searchQ = e.Value?.ToString() ?? string.Empty" />
+            </div>
             <div class="table-scroll">
                 <table class="data-table">
                     <thead>
@@ -146,7 +154,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var l in leases)
+                        @foreach (var l in FilteredLeases)
                         {
                             <!-- Rows expiring within 60 days are highlighted in orange -->
                             <tr style="@(recentlyUpdated.Contains(l.Id) ? "background:#f0fdf4;transition:background 1s;" : l.IsExpiringSoon ? "background:var(--orange-lt);" : "")">
@@ -310,6 +318,11 @@
 @code {
     bool loading = true, showForm;
     List<Lease> leases        = new();
+    string searchQ = string.Empty;
+    List<Lease> FilteredLeases => string.IsNullOrWhiteSpace(searchQ) ? leases : leases.Where(l =>
+        l.Tenant.FullName.Contains(searchQ, StringComparison.OrdinalIgnoreCase) ||
+        l.Unit.Property.Name.Contains(searchQ, StringComparison.OrdinalIgnoreCase) ||
+        l.Unit.UnitNumber.Contains(searchQ, StringComparison.OrdinalIgnoreCase)).ToList();
     List<Tenant> allTenants   = new();
     List<Property> allProperties = new();
     List<Unit> availableUnits = new();
